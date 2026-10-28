@@ -349,3 +349,48 @@ kind's name in bindings). Empty: a single faint hint.
   adapters type-check from Linux.
 - Native visual, pointer and resource qualification on macOS and Windows is
   not possible from this environment and is listed as remaining work.
+
+## 4. The flat look
+
+A second axis, independent of the layout: `ui.look` is `soft` (the default,
+everything above) or `flat`. Flat is the Helium shape: no glass, no gutters,
+no rims or drops, small radii, one dark or light ground. It is a token axis
+(`frame/src/styles/axes/look.css`, keyed by `data-look="flat"` on the root,
+applied by `theme.applyLayout` beside density and contrast) plus one native
+fact, so no component carries a preference conditional.
+
+- **Native (`chrome_set_flush(flush: bool)` → `Command::SetChromeFlush`)**: with
+  `flush` the window's metrics have `padding = 0` and `gap = 0`, so the page
+  meets the column, the bar and the window's edges, and the page view's corner
+  radius is 0 on both platforms (macOS layer radius, Windows region radius);
+  without it the metrics and radius are what they were. A change relayouts as a
+  journey (`relayout_with(true)`). `hidden_card` keeps `HIDDEN_CARD_INSET`: the
+  card still floats. The frame publishes it from `session/chrome-layout.svelte.ts`
+  whenever `ui.look` is adopted.
+- **Tokens under `data-look="flat"`**: radii collapse to a boxy scale
+  (`--radius-inset` 4, `--radius-row` 6, `--radius-tab` 5,
+  `--radius-control-compact` 5, `--radius-control` 6, `--radius-control-large`
+  8, `--radius-card` 8, `--radius-panel` 8, `--radius-field` 5,
+  `--content-radius` 0, `--content-radius-windows` 0; `--radius-capsule` stays
+  for a genuine disc such as an avatar or a switch thumb); every `--shadow-*`
+  that lifts or floats becomes a hairline (`0 0 0 1px var(--color-border)` for
+  raised, `0 0 0 1px var(--color-border-strong)` for float, popover, menu and
+  overlay) or `none` (control, control-strong, raise, tile, card, field);
+  `--row-rim`, `--lift-rim` and the segment thumbs are hairlines or nothing;
+  the window is opaque in the chrome colour whatever native material is
+  installed (`body { background: var(--color-chrome) }`); the sky light and the
+  card's frost are off, the card is a bordered panel; the gutter paddings in
+  Shell, the stage, the internal stage and the new-tab main are 0; the top bar
+  sits on a hairline rule; tabs, the address pill and the bookmark chips are
+  boxes with 5px corners and flat fills.
+- **Settings**: a "Look" row at the top of the Layout group, a
+  `SegmentedControl` with "Soft" and "Flat" and the description "Flat has no
+  glass, gutters or shadows, and square corners." Choosing Flat also writes
+  `ui.material = none`, since the glass would only be covered; choosing Soft
+  leaves the material as it is.
+- **Theme**: a `mono` preset, "Mono", joins the presets: dark
+  `seeds(0x121214, 0xe9e9ec, 0xbfbfc4)`, light `seeds(0xf4f4f5, 0x1c1c1e, 0x3a3a3f)`,
+  so the flat look can be plain black-grey without the custom editor. Nothing
+  selects it automatically.
+- **Plain new tab under flat**: the search field is a box with a hairline
+  border on the page colour, nothing else on the page.

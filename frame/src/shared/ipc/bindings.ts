@@ -549,6 +549,11 @@ export const commands = {
 	 *  bar hangs there, or puts it back beneath the page.
 	 */
 	chromeRaise: (raised: boolean, x: number | null, y: number | null, width: number | null, height: number | null) => __TAURI_INVOKE<void>("chrome_raise", { raised, x, y, width, height }),
+	/**
+	 *  Flush, the page meets the chrome and the window's edges with no gutter
+	 *  and square corners; otherwise it keeps its gutters and rounded corners.
+	 */
+	chromeSetFlush: (flush: boolean) => __TAURI_INVOKE<void>("chrome_set_flush", { flush }),
 	tabDragOver: (x: number | null, y: number | null) => __TAURI_INVOKE<void>("tab_drag_over", { x, y }),
 	resourceCall: (expectedProfile: string, call: ResourceCall_Deserialize) => __TAURI_INVOKE<ResourceReply_Serialize>("resource_call", { expectedProfile, call }),
 	noteCall: (expectedProfile: string, call: NoteCall) => __TAURI_INVOKE<NoteReply>("note_call", { expectedProfile, call }),
