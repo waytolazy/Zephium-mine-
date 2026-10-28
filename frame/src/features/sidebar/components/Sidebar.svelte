@@ -21,7 +21,7 @@
     toggleMode,
   } from "$session/sidebar-mode.svelte";
   import { commands } from "$shared/ipc/bindings";
-  import { newTabImage } from "$session/newtab-background.svelte";
+  import { newTabImage, newTabPlain } from "$session/newtab-background.svelte";
   import { FROSTS, scene } from "$shared/sky";
   import { uiCommands as ui } from "$domain/ui-commands";
   import SidebarHeader from "./SidebarHeader.svelte";
@@ -80,6 +80,9 @@
   // over it as a card as the pointer reaches the window's left edge. The
   // page's own view takes the pointer there, so native watches the edge.
   let hidden = $derived(isHidden());
+  // The card wears the sky's frost only where the new tab is the sky: over a
+  // picture of the person's own, or a plain page, it takes the chrome's ground.
+  let ownGround = $derived(newTabImage() !== null || newTabPlain());
   // A page hides the column by sliding over it, so the column keeps its
   // shape until it is covered and only then becomes the card; anything the
   // chrome draws itself has nothing to slide, and lets the column go at once.
@@ -483,10 +486,8 @@
   style:left={leaving ? `${leaving.left}px` : undefined}
   style:top={leaving ? `${leaving.top}px` : undefined}
   style:height={leaving ? `${leaving.height}px` : undefined}
-  style:--sidebar-frost={(away || handing) && !newTabImage()
-    ? `url("${FROSTS[scene()]}")`
-    : undefined}
-  data-custom-background={newTabImage() !== null || undefined}
+  style:--sidebar-frost={(away || handing) && !ownGround ? `url("${FROSTS[scene()]}")` : undefined}
+  data-custom-background={ownGround || undefined}
   data-handing={handing ?? undefined}
   data-covering={covering || undefined}
   data-tauri-drag-region="deep"

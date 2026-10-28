@@ -137,6 +137,10 @@ export function applyDragWidth(value: number) {
     return;
   }
   const next = resolveDragWidth(value);
+  if (horizontal()) {
+    acrossWidth(next);
+    return;
+  }
   if (next.mode === mode && next.expanded === expandedWidth) return;
   const modeChanged = next.mode !== mode;
   mode = next.mode;
@@ -144,6 +148,18 @@ export function applyDragWidth(value: number) {
   desiredMode = mode;
   publish(modeChanged);
   if (modeChanged) save(mode);
+}
+
+/** With the tabs across the top a drag sizes the pinned column, and one
+ *  that puts it away unpins it; the shape chosen for the column stays. */
+function acrossWidth(next: { mode: SidebarMode; expanded: number }, send = true) {
+  if (next.mode === "hidden") {
+    pinSidebar(false);
+    return;
+  }
+  if (next.expanded === expandedWidth) return;
+  expandedWidth = next.expanded;
+  if (send) publish();
 }
 
 /** The non-native capture fallback also keeps the rendered layout unchanged. */
@@ -170,6 +186,11 @@ export function adoptResizeWidth(value: number, revision = resizeRevision) {
   if (!Number.isFinite(value)) return;
   // A fast drag overshoots the bounds; it lands on the nearest one.
   const next = resolveDragWidth(Math.max(COMPACT_WIDTH, Math.min(MAX_EXPANDED_WIDTH, value)));
+  if (horizontal()) {
+    resizeSettlement++;
+    acrossWidth(next, false);
+    return;
+  }
   if (next.mode === "hidden") {
     expandedWidth = next.expanded;
     resizeSettlement++;

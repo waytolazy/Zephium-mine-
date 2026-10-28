@@ -48,7 +48,7 @@
   <header class="flex shrink-0 flex-col items-center gap-[3px]" aria-label={m.ui_navigation()}>
     {#if lights}
       <div style:height="var(--titlebar-height)" aria-hidden="true"></div>
-    {:else if IS_MAC || bar}
+    {:else if IS_MAC && !bar}
       <div style:height="8px" aria-hidden="true"></div>
     {/if}
     <ModeTabs compact />

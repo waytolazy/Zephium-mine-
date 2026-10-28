@@ -4,6 +4,8 @@
   import { Add01Icon, Layers01Icon, PencilEdit02Icon } from "@hugeicons/core-free-icons";
   import type { SpaceView } from "$shared/ipc/bindings";
   import { tabs } from "$domain/tabs";
+  import { uiCommands as ui } from "$domain/ui-commands";
+  import { untrack } from "svelte";
   import Disclosure from "$shared/ui/Disclosure";
   import Icon from "$shared/ui/Icon";
   import SpaceGlyph from "./SpaceGlyph.svelte";
@@ -12,6 +14,18 @@
 
   let { active }: { active: SpaceView } = $props();
   const spaces = $derived(tabs.spaces());
+
+  // Making or editing a space from a menu opens the column in place for it.
+  // Handled here rather than by the rail around this stack, so a rail under
+  // the top bar, which has no tab list, answers the menu too.
+  $effect(() => {
+    const command = ui.uiCommand();
+    if (command.id !== "space.new" && command.id !== "space.edit") return;
+    untrack(() => {
+      if (!requests.claim(command.seq)) return;
+      requests.openInColumn(command.id === "space.new" ? "new" : "edit");
+    });
+  });
 
   // Holding Control names the key of every row in place of its mark.
   let ctrl = $state(false);

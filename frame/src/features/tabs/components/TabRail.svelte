@@ -17,9 +17,7 @@
   import CaptureControl from "$shared/ui/CaptureControl";
   import SpacePeek from "./SpacePeek.svelte";
   import RailSpaces from "./RailSpaces.svelte";
-  import { uiCommands as ui } from "$domain/ui-commands";
   import { remember } from "../lib/space-memory";
-  import * as requests from "../lib/space-requests.svelte";
   import { arrive, spaceSwipe, stepSpace } from "../lib/space-swipe";
   import { closeOnMiddleClick } from "../lib/middle-click";
 
@@ -90,15 +88,6 @@
       if (shownSpace !== null && next !== shownSpace && from !== -1 && to !== -1)
         arrive(stage, to > from ? 1 : -1);
       shownSpace = next;
-    });
-  });
-  // Making or editing a space from a menu opens the column in place for it.
-  $effect(() => {
-    const command = ui.uiCommand();
-    if (command.id !== "space.new" && command.id !== "space.edit") return;
-    untrack(() => {
-      if (!requests.claim(command.seq) || space === undefined) return;
-      requests.openInColumn(command.id === "space.new" ? "new" : "edit");
     });
   });
   let shape = $derived(entries.map((tab) => tab.id).join(" "));

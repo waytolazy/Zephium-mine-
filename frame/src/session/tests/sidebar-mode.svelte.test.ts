@@ -288,6 +288,21 @@ describe("with the tabs across the top", () => {
     expect(isHidden()).toBe(sidebarMode() === "hidden");
   });
 
+  it("sizes the pinned column by its handle, and unpins it on a drag that puts it away", () => {
+    across();
+    pinSidebar(true);
+    const shape = sidebarMode();
+    const saves = native.save.mock.calls.length;
+    applyDragWidth(330);
+    expect(expanded()).toBe(330);
+    expect(isHidden()).toBe(false);
+    applyDragWidth(SNAP_THRESHOLD - 1);
+    expect(sidebarPinned()).toBe(false);
+    expect(isHidden()).toBe(true);
+    expect(sidebarMode()).toBe(shape);
+    expect(native.save.mock.calls).toHaveLength(saves);
+  });
+
   it("shows the column briefly with a pin only that showing takes back", () => {
     across();
     const restore = expandBriefly();
