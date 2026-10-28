@@ -24,6 +24,7 @@ const defaults = {
   "ui.newtab-trackers": "true",
   "ui.newtab-focus": "true",
   "ui.tab-layout": "vertical",
+  "ui.bookmarks-bar": "false",
   "ai.enabled": "true",
   "work.enabled": "true",
   "work.screenshots": "true",

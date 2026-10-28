@@ -2,7 +2,7 @@
   import { onDestroy } from "svelte";
   import { tabs } from "$domain/tabs";
   import { commands } from "$shared/ipc/bindings";
-  import { retryImage } from "$session/newtab-background.svelte";
+  import { newTabPlain, retryImage } from "$session/newtab-background.svelte";
   import Button from "$shared/ui/Button";
   import * as m from "$shared/i18n/messages";
   import { preferences } from "$domain/preferences";
@@ -23,6 +23,9 @@
   });
   let busy = $derived(importing || resetting || preferences.saving());
   let ownImage = $derived(preferences.value("ui.newtab-background") === "image");
+  // A plain page shows only the field, so what it could show is left as it is.
+  let plain = $derived(newTabPlain());
+  let fixed = $derived(busy || plain);
 
   async function importImage() {
     const owner = tabs.profile()?.id;
@@ -93,6 +96,7 @@
       options={[
         { value: "sky", label: m.ntp_sky() },
         { value: "image", label: m.ntp_own_image() },
+        { value: "plain", label: m.ntp_plain() },
       ]}
     />
   </SettingsRow>
@@ -124,7 +128,7 @@
       label={m.ntp_wordmark()}
       labelHidden
       checked={preferences.value("ui.newtab-wordmark") !== "false"}
-      disabled={busy}
+      disabled={fixed}
       onchange={(v) => set("ui.newtab-wordmark", String(v))}
     />
   </SettingsRow>
@@ -136,7 +140,7 @@
       label={m.pref_ntp_greeting()}
       labelHidden
       checked={greeting}
-      disabled={busy}
+      disabled={fixed}
       onchange={(v) => set("ui.newtab-greeting", String(v))}
     /></SettingsRow
   >
@@ -148,7 +152,7 @@
       label={m.pref_ntp_personalize()}
       labelHidden
       checked={preferences.value("ui.newtab-name") === "true"}
-      disabled={busy || !greeting}
+      disabled={fixed || !greeting}
       onchange={(v) => set("ui.newtab-name", String(v))}
     /></SettingsRow
   >
@@ -160,7 +164,7 @@
       label={m.pref_ntp_clock()}
       labelHidden
       checked={clock}
-      disabled={busy}
+      disabled={fixed}
       onchange={(v) => set("ui.newtab-clock", String(v))}
     /></SettingsRow
   >
@@ -172,7 +176,7 @@
       label={m.pref_ntp_clock_format()}
       labelHidden
       value={preferences.value("ui.newtab-clock-format")}
-      disabled={busy || !clock}
+      disabled={fixed || !clock}
       options={[
         { value: "system", label: m.pref_ntp_clock_format_option_0() },
         { value: "12h", label: m.pref_ntp_clock_format_option_1() },
@@ -189,7 +193,7 @@
       label={m.ntp_trackers_blocked()}
       labelHidden
       checked={preferences.value("ui.newtab-trackers") !== "false"}
-      disabled={busy}
+      disabled={fixed}
       onchange={(v) => set("ui.newtab-trackers", String(v))}
     />
   </SettingsRow>
@@ -199,7 +203,7 @@
         label={m.ntp_focused()}
         labelHidden
         checked={preferences.value("ui.newtab-focus") !== "false"}
-        disabled={busy}
+        disabled={fixed}
         onchange={(v) => set("ui.newtab-focus", String(v))}
       />
     </SettingsRow>
@@ -212,7 +216,7 @@
         label={m.pref_ntp_tasks()}
         labelHidden
         checked={preferences.value("ui.newtab-tasks") === "true"}
-        disabled={busy}
+        disabled={fixed}
         onchange={(v) => set("ui.newtab-tasks", String(v))}
       /></SettingsRow
     >{/if}

@@ -62,6 +62,22 @@ export const fields = {
     description: m.settings_color_scheme_desc,
     initial: "system",
   },
+  "appearance.layout": {
+    section: "appearance",
+    label: m.settings_tab_layout,
+    description: m.settings_tab_layout_desc,
+    initial: "vertical",
+    options: [
+      { value: "vertical", label: m.settings_layout_vertical },
+      { value: "horizontal", label: m.settings_layout_horizontal },
+    ],
+  },
+  "appearance.bookmarks-bar": {
+    section: "appearance",
+    label: m.settings_bookmarks_bar,
+    description: m.settings_bookmarks_bar_desc,
+    initial: false,
+  },
   "appearance.sidebar": {
     section: "appearance",
     label: m.settings_sidebar,
@@ -220,6 +236,7 @@ export const fields = {
     options: [
       { value: "sky", label: m.ntp_sky },
       { value: "image", label: m.ntp_own_image },
+      { value: "plain", label: m.ntp_plain },
     ],
   },
   "ntp.dim": { section: "newtab", label: m.ntp_dim, description: m.ntp_dim_help, initial: false },

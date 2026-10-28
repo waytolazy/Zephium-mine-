@@ -11,7 +11,7 @@
   import { commands } from "$shared/ipc/bindings";
   import { events } from "$shared/ipc/native-events";
   import { preferences } from "$domain/preferences";
-  import { newTabImage, imageFailed } from "$session/newtab-background.svelte";
+  import { newTabImage, newTabPlain, imageFailed } from "$session/newtab-background.svelte";
   import { taskCounts } from "$domain/resources";
   import { tabs } from "$domain/tabs";
   import Icon from "$shared/ui/Icon";
@@ -69,8 +69,11 @@
   let showAccount = $derived(!!onaccount && account.available);
   let signInWidth = $state(0);
   let profile = $derived(tabs.profile()?.id ?? null);
+  // Plain is only the field on the page's own colour: nothing below is read
+  // or drawn for it.
+  let plain = $derived(newTabPlain());
   let picture = $derived(newTabImage());
-  let useSky = $derived(picture === null);
+  let useSky = $derived(!plain && picture === null);
   let background = $derived.by(() => {
     const selected = picture;
     return selected
@@ -81,14 +84,17 @@
       : null;
   });
   let showWordmark = $derived(preferences.value("ui.newtab-wordmark") !== "false");
-  let showTrackers = $derived(preferences.value("ui.newtab-trackers") !== "false");
+  let showTrackers = $derived(!plain && preferences.value("ui.newtab-trackers") !== "false");
   let showGreeting = $derived(preferences.value("ui.newtab-greeting") === "true");
-  let showClock = $derived(preferences.value("ui.newtab-clock") === "true");
+  let showClock = $derived(!plain && preferences.value("ui.newtab-clock") === "true");
   let showDue = $derived(
-    !incognito && preferences.enabled("tasks") && preferences.value("ui.newtab-tasks") === "true",
+    !plain &&
+      !incognito &&
+      preferences.enabled("tasks") &&
+      preferences.value("ui.newtab-tasks") === "true",
   );
   let showFocus = $derived(
-    preferences.enabled("time") && preferences.value("ui.newtab-focus") !== "false",
+    !plain && preferences.enabled("time") && preferences.value("ui.newtab-focus") !== "false",
   );
   let today = $derived(dayKey(now));
 
@@ -276,7 +282,8 @@
     };
   });
 
-  onMount(() => {
+  $effect(() => {
+    if (plain) return;
     void accountSession.retain();
     return () => accountSession.release();
   });
@@ -310,186 +317,193 @@
   reaches down into it through the notch the field hangs in. The dots are
   baked into the picture, so the page only shows it.
 -->
-<section
-  bind:this={section}
-  class="newtab"
-  class:arriving={useSky && arriving}
-  class:entering={useSky && !arriving}
-  class:custom={!useSky}
-  data-scene={scene}
-  data-ready={!useSky || shown === scene}
-  aria-label={m.new_tab()}
-  style:--sky-frost={useSky ? `url("${FROSTS[scene]}")` : undefined}
-  style:--sky-frost-size={`${sky.w}px ${sky.h}px`}
-  style:--sky-frost-x={`${sky.x - (width - fieldWidth) / 2}px`}
-  style:--sky-frost-y={`${sky.y - page.notch.height}px`}
-  bind:clientWidth={width}
-  bind:clientHeight={height}
->
-  {#if ground}<div class="page" aria-hidden="true" style:clip-path={`path(evenodd, "${ground}")`}>
-      {#if picture && width > 0 && height > 0}
-        {#key picture.key}
-          {@const selected = picture}
-          {#await background then loaded}
-            {#if loaded}<loaded.default
-                profile={picture.profile}
-                digest={picture.digest}
-                {width}
-                {height}
-                dim={preferences.value("ui.newtab-dim") === "true"}
-                onfailure={() => {
-                  imageFailed(selected.key);
-                }}
-              />{/if}
-          {/await}
-        {/key}
-      {:else if useSky}<div
-          class="sky"
-          style:background-image={`url("${SCENES[scene]}")`}
-          style:background-size={`${sky.w}px ${sky.h}px`}
-          style:background-position={`${sky.x}px ${sky.y}px`}
-        ></div>{/if}
-    </div>{/if}
+{#if plain}
+  <!-- Only the field, on the page's own colour. -->
+  <section class="plain" aria-label={m.new_tab()}>
+    <div class="plain-field">{@render search()}</div>
+  </section>
+{:else}
+  <section
+    bind:this={section}
+    class="newtab"
+    class:arriving={useSky && arriving}
+    class:entering={useSky && !arriving}
+    class:custom={!useSky}
+    data-scene={scene}
+    data-ready={!useSky || shown === scene}
+    aria-label={m.new_tab()}
+    style:--sky-frost={useSky ? `url("${FROSTS[scene]}")` : undefined}
+    style:--sky-frost-size={`${sky.w}px ${sky.h}px`}
+    style:--sky-frost-x={`${sky.x - (width - fieldWidth) / 2}px`}
+    style:--sky-frost-y={`${sky.y - page.notch.height}px`}
+    bind:clientWidth={width}
+    bind:clientHeight={height}
+  >
+    {#if ground}<div class="page" aria-hidden="true" style:clip-path={`path(evenodd, "${ground}")`}>
+        {#if picture && width > 0 && height > 0}
+          {#key picture.key}
+            {@const selected = picture}
+            {#await background then loaded}
+              {#if loaded}<loaded.default
+                  profile={picture.profile}
+                  digest={picture.digest}
+                  {width}
+                  {height}
+                  dim={preferences.value("ui.newtab-dim") === "true"}
+                  onfailure={() => {
+                    imageFailed(selected.key);
+                  }}
+                />{/if}
+            {/await}
+          {/key}
+        {:else if useSky}<div
+            class="sky"
+            style:background-image={`url("${SCENES[scene]}")`}
+            style:background-size={`${sky.w}px ${sky.h}px`}
+            style:background-position={`${sky.x}px ${sky.y}px`}
+          ></div>{/if}
+      </div>{/if}
 
-  <!-- Light caught along the edge where the page meets the window, fading
+    <!-- Light caught along the edge where the page meets the window, fading
        away from it: a strip as tall as the notch, so it is drawn once. -->
-  {#if useSky}<svg class="rim" aria-hidden="true" style:height={`${page.notch.height + 1}px`}>
-      <defs>
-        <linearGradient id={`${id}-lip`} x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0" class="lip" />
-          <stop offset="0.6" class="lip" stop-opacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={lip} stroke={`url(#${id}-lip)`} />
-    </svg>
-  {/if}
+    {#if useSky}<svg class="rim" aria-hidden="true" style:height={`${page.notch.height + 1}px`}>
+        <defs>
+          <linearGradient id={`${id}-lip`} x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" class="lip" />
+            <stop offset="0.6" class="lip" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={lip} stroke={`url(#${id}-lip)`} />
+      </svg>
+    {/if}
 
-  <!-- The name, drawn only as large as itself. -->
-  {#if showWordmark}<svg class="mark" role="img" aria-label="Zephium" style={at(page.mark)}>
-      <defs>
-        <path id={`${id}-letters`} d={WORDMARK.d} transform={letters} />
-        {#if glint && useSky}<linearGradient
-            id={`${id}-glint`}
-            gradientUnits="userSpaceOnUse"
-            x1={-page.mark.h * 3}
-            x2="0"
-            y1="0"
-            y2={page.mark.h}
-          >
-            <stop offset="0" class="glint" stop-opacity="0" />
-            <stop offset="0.5" class="glint" />
-            <stop offset="1" class="glint" stop-opacity="0" />
-            <animateTransform
-              attributeName="gradientTransform"
-              type="translate"
-              from="0 0"
-              to={`${page.mark.w + page.mark.h * 3} 0`}
-              begin="0.5s"
-              dur="1.3s"
-              calcMode="spline"
-              keyTimes="0;1"
-              keySplines="0.3 0 0.2 1"
-              fill="freeze"
-            />
-          </linearGradient>{/if}
-      </defs>
-      <use class="name" href={`#${id}-letters`} />
-      {#if glint && useSky}<use href={`#${id}-letters`} fill={`url(#${id}-glint)`} />{/if}
-    </svg>
-  {/if}
+    <!-- The name, drawn only as large as itself. -->
+    {#if showWordmark}<svg class="mark" role="img" aria-label="Zephium" style={at(page.mark)}>
+        <defs>
+          <path id={`${id}-letters`} d={WORDMARK.d} transform={letters} />
+          {#if glint && useSky}<linearGradient
+              id={`${id}-glint`}
+              gradientUnits="userSpaceOnUse"
+              x1={-page.mark.h * 3}
+              x2="0"
+              y1="0"
+              y2={page.mark.h}
+            >
+              <stop offset="0" class="glint" stop-opacity="0" />
+              <stop offset="0.5" class="glint" />
+              <stop offset="1" class="glint" stop-opacity="0" />
+              <animateTransform
+                attributeName="gradientTransform"
+                type="translate"
+                from="0 0"
+                to={`${page.mark.w + page.mark.h * 3} 0`}
+                begin="0.5s"
+                dur="1.3s"
+                calcMode="spline"
+                keyTimes="0;1"
+                keySplines="0.3 0 0.2 1"
+                fill="freeze"
+              />
+            </linearGradient>{/if}
+        </defs>
+        <use class="name" href={`#${id}-letters`} />
+        {#if glint && useSky}<use href={`#${id}-letters`} fill={`url(#${id}-glint)`} />{/if}
+      </svg>
+    {/if}
 
-  <!-- The band the field hangs in is the window's title bar: beside the
+    <!-- The band the field hangs in is the window's title bar: beside the
        field, it moves the window. -->
-  <div
-    class="drag"
-    data-tauri-drag-region
-    aria-hidden="true"
-    style:height={`${page.notch.height}px`}
-  ></div>
+    <div
+      class="drag"
+      data-tauri-drag-region
+      aria-hidden="true"
+      style:height={`${page.notch.height}px`}
+    ></div>
 
-  <div class="field" style:width={`${fieldWidth}px`} style:height={`${page.notch.height}px`}>
-    {@render search()}
-  </div>
-
-  {#if showGreeting}
-    <p class="greeting" style:bottom={`${height - page.mark.y + 18}px`}>
-      {greeting}
-    </p>
-  {/if}
-
-  {#if page.when !== null}
-    <p class="when" style:top={`${page.when}px`}>
-      <time class="time" datetime={now.toISOString()}
-        >{#if face.period !== null && face.periodLeading}<span class="period"
-            >{`${face.period} `}</span
-          >{/if}{face.time}{#if face.period !== null && !face.periodLeading}<span class="period"
-            >{` ${face.period}`}</span
-          >{/if}</time
-      ><span class="date">{date}</span>
-    </p>
-  {/if}
-
-  <!-- Each control a disc of light on the sky, level with the field. -->
-  {#if showAccount && onaccount && page.controls[0]}
-    <div class="control" style={at(page.controls[0])}>
-      <NewTabAccount {account} {onaccount} bind:signInWidth />
+    <div class="field" style:width={`${fieldWidth}px`} style:height={`${page.notch.height}px`}>
+      {@render search()}
     </div>
-  {/if}
-  {#if oncustomize && page.controls.at(-1)}
-    <div class="control" style={at(page.controls.at(-1)!)}>
-      <IconButton
-        icon={Settings01Icon}
-        label={m.settings_customize_newtab()}
-        shape="circle"
-        size={16}
-        buttonSize={32}
-        onclick={oncustomize}
-      />
-    </div>
-  {/if}
 
-  <!-- A private window has no figures; what it promises stands in their place. -->
-  {#if incognito}
-    <p class="note">{m.ntp_private()}</p>
-  {:else if figures.length}
-    <!-- The day in figures, along the foot of the page; they step aside
+    {#if showGreeting}
+      <p class="greeting" style:bottom={`${height - page.mark.y + 18}px`}>
+        {greeting}
+      </p>
+    {/if}
+
+    {#if page.when !== null}
+      <p class="when" style:top={`${page.when}px`}>
+        <time class="time" datetime={now.toISOString()}
+          >{#if face.period !== null && face.periodLeading}<span class="period"
+              >{`${face.period} `}</span
+            >{/if}{face.time}{#if face.period !== null && !face.periodLeading}<span class="period"
+              >{` ${face.period}`}</span
+            >{/if}</time
+        ><span class="date">{date}</span>
+      </p>
+    {/if}
+
+    <!-- Each control a disc of light on the sky, level with the field. -->
+    {#if showAccount && onaccount && page.controls[0]}
+      <div class="control" style={at(page.controls[0])}>
+        <NewTabAccount {account} {onaccount} bind:signInWidth />
+      </div>
+    {/if}
+    {#if oncustomize && page.controls.at(-1)}
+      <div class="control" style={at(page.controls.at(-1)!)}>
+        <IconButton
+          icon={Settings01Icon}
+          label={m.settings_customize_newtab()}
+          shape="circle"
+          size={16}
+          buttonSize={32}
+          onclick={oncustomize}
+        />
+      </div>
+    {/if}
+
+    <!-- A private window has no figures; what it promises stands in their place. -->
+    {#if incognito}
+      <p class="note">{m.ntp_private()}</p>
+    {:else if figures.length}
+      <!-- The day in figures, along the foot of the page; they step aside
          while a search is open. -->
-    <div class="figures">
-      {#each figures as figure (figure)}
-        {#if figure === "trackers"}
-          <div class="figure">
-            <Icon icon={Shield01Icon} size={14} /><span class="name"
-              >{m.ntp_trackers_blocked()}</span
-            ><span class="value">{number.format(blocked ?? 0)}</span>
-          </div>
-        {:else if figure === "focus"}
-          <button type="button" class="figure" onclick={ontime}>
-            <Icon icon={Clock01Icon} size={14} /><span class="name">{m.ntp_focused()}</span><span
-              class="value">{focusSpan(focusMinutes)}</span
-            ><span
-              class="meter"
-              role="meter"
-              aria-label={m.ntp_focus_goal({ goal: focusSpan(focusGoalMinutes) })}
-              aria-valuemin={0}
-              aria-valuemax={focusGoalMinutes}
-              aria-valuenow={Math.min(focusMinutes, focusGoalMinutes)}
-              ><span class="fill" style:transform={`scaleX(${focusShare})`}></span></span
-            >
-          </button>
-        {:else}
-          <button type="button" class="figure" onclick={ontasks}>
-            <Icon icon={CheckListIcon} size={14} /><span class="name">{m.ntp_due_today()}</span
-            ><span class="value">{due.today}</span><span class="foot" class:late={due.overdue > 0}
-              >{due.overdue > 0
-                ? m.ntp_overdue({ count: due.overdue })
-                : m.ntp_nothing_overdue()}</span
-            >
-          </button>
-        {/if}
-      {/each}
-    </div>
-  {/if}
-</section>
+      <div class="figures">
+        {#each figures as figure (figure)}
+          {#if figure === "trackers"}
+            <div class="figure">
+              <Icon icon={Shield01Icon} size={14} /><span class="name"
+                >{m.ntp_trackers_blocked()}</span
+              ><span class="value">{number.format(blocked ?? 0)}</span>
+            </div>
+          {:else if figure === "focus"}
+            <button type="button" class="figure" onclick={ontime}>
+              <Icon icon={Clock01Icon} size={14} /><span class="name">{m.ntp_focused()}</span><span
+                class="value">{focusSpan(focusMinutes)}</span
+              ><span
+                class="meter"
+                role="meter"
+                aria-label={m.ntp_focus_goal({ goal: focusSpan(focusGoalMinutes) })}
+                aria-valuemin={0}
+                aria-valuemax={focusGoalMinutes}
+                aria-valuenow={Math.min(focusMinutes, focusGoalMinutes)}
+                ><span class="fill" style:transform={`scaleX(${focusShare})`}></span></span
+              >
+            </button>
+          {:else}
+            <button type="button" class="figure" onclick={ontasks}>
+              <Icon icon={CheckListIcon} size={14} /><span class="name">{m.ntp_due_today()}</span
+              ><span class="value">{due.today}</span><span class="foot" class:late={due.overdue > 0}
+                >{due.overdue > 0
+                  ? m.ntp_overdue({ count: due.overdue })
+                  : m.ntp_nothing_overdue()}</span
+              >
+            </button>
+          {/if}
+        {/each}
+      </div>
+    {/if}
+  </section>
+{/if}
 
 <style>
   /* Whatever the page leaves open is the window: the chrome's own colour on
@@ -542,6 +556,43 @@
     --disc-fill: var(--color-surface);
     --sky-shadow: var(--newtab-image-dim);
     --disc-rim: var(--color-border);
+  }
+
+  /* The plain page is its own colour and the field level with the eye. The
+     field in the notch is only its words, so the surface it stands on is
+     drawn here, and the results sheet is given the quiet card it wears on a
+     picture. */
+  .plain {
+    --sky-card: var(--color-raised);
+    --sky-card-rim: transparent;
+    --sky-card-edge: var(--color-border);
+
+    position: relative;
+    block-size: 100%;
+    overflow: hidden;
+    background: var(--color-page);
+    isolation: isolate;
+  }
+
+  .plain-field {
+    position: absolute;
+    inset-block-start: 38%;
+    inset-inline: 0;
+    box-sizing: border-box;
+    inline-size: min(560px, calc(100% - 32px));
+    block-size: 50px;
+    margin-inline: auto;
+    border-radius: var(--radius-panel);
+    background: var(--color-surface);
+    box-shadow:
+      inset 0 0 0 1px var(--color-border),
+      var(--shadow-control);
+  }
+
+  .plain-field:focus-within {
+    box-shadow:
+      inset 0 0 0 1px var(--color-field-ring),
+      var(--shadow-control);
   }
 
   .page,
@@ -905,6 +956,11 @@
   }
 
   @media (forced-colors: active) {
+    .plain-field {
+      border: 1px solid CanvasText;
+      background: Canvas;
+    }
+
     .sky {
       display: none;
     }

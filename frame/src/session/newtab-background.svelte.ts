@@ -11,6 +11,9 @@ export function newTabImage() {
   const key = `${profile}/${digest}`;
   return failed === key ? null : { profile, digest, key };
 }
+/** The page the person asked to be plain: a flat ground with the field and
+ *  nothing else, so there is no sky, and none of its light, to show. */
+export const newTabPlain = () => preferences.value("ui.newtab-background") === "plain";
 export function imageFailed(key: string) {
   failed = key;
 }

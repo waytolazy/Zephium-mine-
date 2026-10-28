@@ -20,6 +20,7 @@ pub const KEYS: &[&str] = &[
     "ui.newtab-trackers",
     "ui.newtab-focus",
     "ui.tab-layout",
+    "ui.bookmarks-bar",
     "onboarding",
     "ai.enabled",
     "work.enabled",
@@ -200,7 +201,8 @@ pub fn value_allowed(key: &str, value: &str) -> bool {
             value,
             "auto" | "liquid_glass" | "vibrancy" | "acrylic" | "mica" | "none"
         ),
-        "ui.newtab-background" => matches!(value, "sky" | "image"),
+        // `plain` is a flat page with the search field and nothing else.
+        "ui.newtab-background" => matches!(value, "sky" | "image" | "plain"),
         // An admitted local blob, never a URL or a filesystem path. The media
         // protocol resolves it only inside the current profile's store.
         "ui.newtab-image" => {
@@ -307,6 +309,7 @@ pub fn value_allowed(key: &str, value: &str) -> bool {
         | "ui.newtab-wordmark"
         | "ui.newtab-trackers"
         | "ui.newtab-focus"
+        | "ui.bookmarks-bar"
         | "ai.enabled"
         | "work.enabled"
         | "notes.enabled"
@@ -344,10 +347,12 @@ mod tests {
             assert!(value_allowed(key, "false"));
             assert!(!value_allowed(key, "1"));
         }
-        for value in ["sky", "image"] {
+        for value in ["sky", "image", "plain"] {
             assert!(value_allowed("ui.newtab-background", value));
         }
-        assert!(!value_allowed("ui.newtab-background", "gradient"));
+        for value in ["gradient", "", "Plain", "plain ", "none"] {
+            assert!(!value_allowed("ui.newtab-background", value));
+        }
         assert!(KEYS.contains(&"ui.newtab-background"));
         assert!(KEYS.contains(&"ui.newtab-image"));
         assert!(value_allowed("ui.newtab-image", ""));
@@ -363,6 +368,16 @@ mod tests {
             &"a".repeat(65),
         ] {
             assert!(!value_allowed("ui.newtab-image", value));
+        }
+    }
+
+    #[test]
+    fn bookmarks_bar_is_a_closed_boolean() {
+        assert!(KEYS.contains(&"ui.bookmarks-bar"));
+        assert!(value_allowed("ui.bookmarks-bar", "true"));
+        assert!(value_allowed("ui.bookmarks-bar", "false"));
+        for value in ["", "0", "1", "TRUE", " false", "false ", "on"] {
+            assert!(!value_allowed("ui.bookmarks-bar", value));
         }
     }
 

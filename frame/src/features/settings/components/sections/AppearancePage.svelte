@@ -1,5 +1,6 @@
 <script lang="ts">
   import PreferenceSelect from "../PreferenceSelect.svelte";
+  import PreferenceSwitch from "../PreferenceSwitch.svelte";
   import ZoomLevels from "../ZoomLevels.svelte";
   import ModePicker from "../appearance/ModePicker.svelte";
   import ThemeGallery from "../appearance/ThemeGallery.svelte";
@@ -118,6 +119,13 @@
 
 <SettingsGroup title={m.look_colors()}>
   <ThemeColors {editor} bind:mode />
+</SettingsGroup>
+
+<SettingsGroup title={m.settings_layout()}>
+  <PreferenceSelect id="appearance.layout" preference="ui.tab-layout" />
+  {#if preferences.value("ui.tab-layout") === "horizontal"}
+    <PreferenceSwitch id="appearance.bookmarks-bar" preference="ui.bookmarks-bar" />
+  {/if}
 </SettingsGroup>
 
 <SettingsGroup title={m.look_window()}>

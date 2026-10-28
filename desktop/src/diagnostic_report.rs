@@ -33,6 +33,7 @@ const SETTINGS: &[(&str, &str)] = &[
     ("appearance", "appearance"),
     ("material", "ui.material"),
     ("tabs", "ui.tab-layout"),
+    ("bookmarks bar", "ui.bookmarks-bar"),
     ("memory", "performance.memory"),
 ];
 const FEATURES: &[(&str, &str)] = &[
