@@ -9,6 +9,7 @@
 @import "./axes/density.css";
 @import "./axes/contrast.css";
 @import "./axes/material.css";
+@import "./axes/look.css";
 @import "./axes/motion.css";
 @import "./axes/type.css";
 @import "./controls.css";
@@ -90,14 +91,15 @@ button {
 /* The window's own ground, the colour native paints behind the chrome, so the
    gutter around a page the frame draws reads as window rather than page. The
    column is not painted again on top: one ground, with only the page set
-   apart from it. */
-:root[data-material="none"] body {
+   apart from it. The flat look is this ground whatever the material
+   (axes/look.css). */
+:root:is([data-material="none"], [data-look="flat"]) body {
   background: var(--color-chrome);
 }
 
 /* Windows rounds the window and draws its edge itself, in every tier; an edge
    of our own inside it showed as a second, rounder corner in Solid. */
-:root[data-material="none"] .shell[data-caption] {
+:root:is([data-material="none"], [data-look="flat"]) .shell[data-caption] {
   background: var(--color-chrome);
 }
 
@@ -233,12 +235,15 @@ kbd {
 }
 
 /* Native material samples arbitrary content. Keep text stronger than on solid
-   surfaces, with hierarchy carried by shape and weight rather than opacity. */
-:root[data-material="liquid_glass"] :is(.browser-sidebar, [data-glass-text]) {
+   surfaces, with hierarchy carried by shape and weight rather than opacity.
+   The flat look covers the glass, so its text is the solid surface's. */
+:root[data-material="liquid_glass"]:not([data-look="flat"])
+  :is(.browser-sidebar, [data-glass-text]) {
   --color-muted: rgb(244 244 246 / 0.78);
   --color-faint: rgb(244 244 246 / 0.55);
 }
-:root[data-material="liquid_glass"][data-theme="light"] :is(.browser-sidebar, [data-glass-text]) {
+:root[data-material="liquid_glass"][data-theme="light"]:not([data-look="flat"])
+  :is(.browser-sidebar, [data-glass-text]) {
   --color-muted: rgb(27 28 33 / 0.72);
   --color-faint: rgb(27 28 33 / 0.55);
 }
@@ -273,11 +278,12 @@ kbd {
 
 /* The same overrides read from a chosen theme's own ink. */
 @supports (color: color-mix(in oklab, red, red)) {
-  :root[data-palette][data-material="liquid_glass"] :is(.browser-sidebar, [data-glass-text]) {
+  :root[data-palette][data-material="liquid_glass"]:not([data-look="flat"])
+    :is(.browser-sidebar, [data-glass-text]) {
     --color-muted: color-mix(in srgb, var(--seed-fg) calc(58% + 20% * var(--seed-k)), transparent);
     --color-faint: color-mix(in srgb, var(--seed-fg) calc(31% + 24% * var(--seed-k)), transparent);
   }
-  :root[data-palette][data-material="liquid_glass"][data-theme="light"]
+  :root[data-palette][data-material="liquid_glass"][data-theme="light"]:not([data-look="flat"])
     :is(.browser-sidebar, [data-glass-text]) {
     --color-muted: color-mix(in srgb, var(--seed-fg) calc(52% + 20% * var(--seed-k)), transparent);
     --color-faint: color-mix(in srgb, var(--seed-fg) calc(31% + 24% * var(--seed-k)), transparent);

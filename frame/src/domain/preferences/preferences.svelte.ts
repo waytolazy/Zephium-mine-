@@ -25,6 +25,7 @@ const defaults = {
   "ui.newtab-focus": "true",
   "ui.tab-layout": "vertical",
   "ui.bookmarks-bar": "false",
+  "ui.look": "soft",
   "ai.enabled": "true",
   "work.enabled": "true",
   "work.screenshots": "true",

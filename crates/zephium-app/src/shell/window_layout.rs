@@ -24,7 +24,7 @@ impl Shell {
         let region =
             layout::compute(win.size, win.mode, win.metrics, self.present(&tree)).content?;
         let local = Rect::new(0.0, 0.0, region.width, region.height);
-        split::drop_target(&tree, local, win.metrics.gap, x - region.x, y - region.y)
+        split::drop_target(&tree, local, split::GAP, x - region.x, y - region.y)
     }
 
     pub(super) fn relayout(&self) -> NativeDispatch {
@@ -119,7 +119,7 @@ impl Shell {
         let dividers = match (&tree, l.content) {
             (Some(tree), Some(region)) if !browser_page_active => {
                 let local = Rect::new(0.0, 0.0, region.width, region.height);
-                split::dividers(tree, local, win.metrics.gap)
+                split::dividers(tree, local, split::GAP)
                     .into_iter()
                     .map(|d| DividerView {
                         x: region.x + d.strip.x,
@@ -150,7 +150,7 @@ impl Shell {
         let region =
             layout::compute(win.size, win.mode, win.metrics, self.present(&tree)).content?;
         let local = Rect::new(0.0, 0.0, region.width, region.height);
-        let divider = split::divider_at(&tree, local, win.metrics.gap, x - region.x, y - region.y)?;
+        let divider = split::divider_at(&tree, local, split::GAP, x - region.x, y - region.y)?;
         let anchor = (
             x - region.x - divider.strip.x,
             y - region.y - divider.strip.y,
@@ -219,7 +219,9 @@ impl Shell {
         let Some(region) = layout::compute(win.size, win.mode, win.metrics, true).content else {
             return;
         };
-        let gap = win.metrics.gap;
+        // The panes keep their gutter in a flush window, where the page's
+        // own gap from the chrome is gone.
+        let gap = split::GAP;
         let Some(tree) = current_tree.as_ref() else {
             self.drop_divider();
             return;

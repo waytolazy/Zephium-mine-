@@ -1835,6 +1835,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             sidebar_resize_guide,
             chrome_set_layout,
             chrome_raise,
+            chrome_set_flush,
             tab_drag_over,
             resource_call,
             notes::note_call,
@@ -5492,6 +5493,17 @@ fn chrome_raise(
     shell.dispatch(Command::RaiseChrome { raised, rect });
 }
 
+/// Flush, the page meets the chrome and the window's edges with no gutter
+/// and square corners; otherwise it keeps its gutters and rounded corners.
+#[tauri::command]
+#[specta::specta]
+fn chrome_set_flush(caller: WebviewWindow, shell: State<'_, Handle>, flush: bool) {
+    if !authorize(&caller, CallerPolicy::Main, "chrome_set_flush") {
+        return;
+    }
+    shell.dispatch(Command::SetChromeFlush(flush));
+}
+
 #[tauri::command]
 #[specta::specta]
 fn tab_drag_over(caller: WebviewWindow, shell: State<'_, Handle>, x: Option<f64>, y: Option<f64>) {
@@ -8217,10 +8229,15 @@ mod tests {
             .position(|name| *name == "sidebar_resize_guide")
             .expect("sidebar resize guide is registered");
         assert_eq!(
-            registered[guide..guide + 3],
-            ["sidebar_resize_guide", "chrome_set_layout", "chrome_raise"]
+            registered[guide..guide + 4],
+            [
+                "sidebar_resize_guide",
+                "chrome_set_layout",
+                "chrome_raise",
+                "chrome_set_flush"
+            ]
         );
-        for name in ["chrome_set_layout", "chrome_raise"] {
+        for name in ["chrome_set_layout", "chrome_raise", "chrome_set_flush"] {
             assert_eq!(registered.iter().filter(|entry| **entry == name).count(), 1);
             let command = source
                 .split(&format!("fn {name}("))

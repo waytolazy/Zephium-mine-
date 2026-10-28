@@ -561,7 +561,8 @@
   /* The plain page is its own colour and the field level with the eye. The
      field in the notch is only its words, so the surface it stands on is
      drawn here, and the results sheet is given the quiet card it wears on a
-     picture. */
+     picture. In the flat look the field is the page's own colour inside its
+     hairline (--color-page-field). */
   .plain {
     --sky-card: var(--color-raised);
     --sky-card-rim: transparent;
@@ -583,7 +584,7 @@
     block-size: 50px;
     margin-inline: auto;
     border-radius: var(--radius-panel);
-    background: var(--color-surface);
+    background: var(--color-page-field);
     box-shadow:
       inset 0 0 0 1px var(--color-border),
       var(--shadow-control);

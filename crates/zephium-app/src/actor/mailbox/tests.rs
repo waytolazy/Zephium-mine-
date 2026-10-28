@@ -32,7 +32,7 @@ fn sidebar_guide_cleanup_is_reserved_and_not_replaced_by_preview() {
 }
 
 #[test]
-fn the_chromes_shape_and_raise_keep_only_their_latest_fact() {
+fn the_chromes_shape_raise_and_flush_keep_only_their_latest_fact() {
     use zephium_core::geometry::Rect;
     let mut queue = VecDeque::new();
     for command in [
@@ -43,6 +43,7 @@ fn the_chromes_shape_and_raise_keep_only_their_latest_fact() {
             raised: true,
             rect: Rect::new(300.0, 40.0, 360.0, 420.0),
         },
+        Command::SetChromeFlush(true),
         Command::SetChromeLayout {
             top_bar: Some(68.0),
         },
@@ -50,10 +51,11 @@ fn the_chromes_shape_and_raise_keep_only_their_latest_fact() {
             raised: false,
             rect: Rect::new(300.0, 40.0, 360.0, 420.0),
         },
+        Command::SetChromeFlush(false),
     ] {
         assert!(enqueue(&mut queue, command, 8, false).is_ok());
     }
-    assert_eq!(queue.len(), 2);
+    assert_eq!(queue.len(), 3);
     assert!(matches!(
         queue[0],
         Command::SetChromeLayout { top_bar: Some(height) } if height == 68.0
@@ -62,6 +64,7 @@ fn the_chromes_shape_and_raise_keep_only_their_latest_fact() {
         queue[1],
         Command::RaiseChrome { raised: false, .. }
     ));
+    assert!(matches!(queue[2], Command::SetChromeFlush(false)));
 }
 
 #[test]

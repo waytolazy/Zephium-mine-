@@ -1,0 +1,100 @@
+/*
+ * The look axis. Soft is everything in tokens.css: glass, gutters, rounded
+ * pages and the light along a raised edge. Flat is the shape of Chromium's
+ * compact chrome: one opaque ground in the chrome's colour, the page flush
+ * against it, nothing lifted and every corner a few pixels round. Native
+ * squares the page and drops its gutter from the same choice
+ * (`chrome_set_flush`); everything the frame draws follows these tokens, so
+ * no component asks which look it is in.
+ */
+:root[data-look="flat"] {
+  /* Boxy by role: still largest for what is largest, never a pill. A
+     genuine disc (an avatar, a switch's thumb) keeps --radius-capsule. */
+  --radius-inset: 4px;
+  --radius-row: 6px;
+  --radius-tab: 5px;
+  --radius-control-compact: 5px;
+  --radius-control: 6px;
+  --radius-control-large: 8px;
+  --radius-card: 8px;
+  --radius-panel: 8px;
+  --radius-field: 5px;
+  --radius-pill: 5px;
+  --content-radius: 0px;
+  --content-radius-windows: 0px;
+
+  /* No gutter: the page meets the chrome and the window's edges, and the
+     chrome keeps that room inside its own edge instead. */
+  --window-gutter: 0px;
+  --chrome-inset: 8px;
+
+  /* One ground. Menus are solid and blur nothing; dark menus sit a single
+     rung above the chrome rather than on the glass's brighter sheet. */
+  --wash-raised: 100%;
+  --menu-backdrop: none;
+
+  /* The sky's light beside a new tab is off, and so is the card's frost:
+     the hidden column is a bordered panel in the chrome's colour. */
+  --sky-light: 0;
+  --sidebar-card-ground: var(--color-chrome);
+  --sidebar-card-shadow: none;
+
+  /* The switch keeps its disc and loses the glass it turns to while held. */
+  --color-switch-glass: var(--color-switch-thumb);
+  --color-switch-rim: transparent;
+
+  /* The plain new tab's field is the page itself, edged by its hairline. */
+  --color-page-field: transparent;
+}
+
+/* Edges are hairlines and nothing else. "0 0 transparent" is nothing,
+   written as a shadow so a list it stands in still parses. Declared again on
+   a theme preview, so its hairlines are mixed from the preview's own ink. */
+:root[data-look="flat"],
+:root[data-look="flat"] [data-theme-scope] {
+  --shadow-control: 0 0 transparent;
+  --shadow-control-strong: none;
+  --shadow-raise: none;
+  --shadow-tile: 0 0 transparent;
+  --shadow-card: none;
+  --shadow-field: none;
+  --shadow-raised: 0 0 0 1px var(--color-border);
+  --shadow-float: 0 0 0 1px var(--color-border-strong);
+  --shadow-popover: 0 0 0 1px var(--color-border-strong);
+  --shadow-menu: 0 0 0 1px var(--color-border-strong);
+  --shadow-overlay: 0 0 0 1px var(--color-border-strong);
+  --shadow-sheet: none;
+  --shadow-badge: 0 0 0 1px var(--color-border-strong);
+  --shadow-track: inset 0 0 0 1px var(--color-border);
+  --shadow-thumb: 0 0 0 1px var(--color-border-strong);
+  --shadow-thumb-grab: 0 0 0 1px var(--color-border-strong);
+  --shadow-segment-thumb: none;
+  --shadow-segment-thumb-card: 0 0 0 1px var(--color-border);
+  --row-rim: none;
+  --row-rim-ink: none;
+  --lift-rim: 0 0 transparent;
+  --shine: 0 0 transparent;
+  --shine-top: 0 0 transparent;
+
+  /* The field sits on a hairline and the bar on a rule. */
+  --address-edge: inset 0 0 0 1px var(--color-border);
+  --top-bar-rule: inset 0 -1px 0 0 var(--color-border);
+}
+
+:root[data-look="flat"]:not([data-theme="light"]) {
+  --color-float: var(--color-raised);
+}
+
+/* Opaque whatever material native has installed: the window never shows its
+   glass, or the desktop through it, under the flat look. */
+:root[data-look="flat"],
+:root[data-look="flat"] :is(body, #root) {
+  background: var(--color-chrome);
+}
+
+@media (forced-colors: active) {
+  :root[data-look="flat"],
+  :root[data-look="flat"] :is(body, #root) {
+    background: Canvas;
+  }
+}

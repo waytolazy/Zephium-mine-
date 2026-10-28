@@ -7,7 +7,7 @@
   flex: 1;
   min-width: 0;
   height: 100%;
-  padding-inline-start: 8px;
+  padding-inline-start: var(--window-gutter);
 
   /* Nothing here scrolls sideways: clipped, not hidden, so a focus reveal has
      no offset to leave behind and the page cannot slide off its column. */

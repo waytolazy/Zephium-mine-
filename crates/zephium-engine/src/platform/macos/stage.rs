@@ -48,6 +48,9 @@ const DROP_DWELL: Duration = Duration::from_millis(450);
 type RatioCallback = Rc<dyn Fn(Pane)>;
 type StageFailureCallback = Rc<dyn Fn(usize)>;
 const MAX_ASYNC_STAGE_RETRIES: u8 = 4;
+/// A page's corner unless its window is flush: what `configure` gives every
+/// new page.
+const PAGE_RADIUS: f64 = 12.0;
 
 #[derive(Clone)]
 struct HostView {
@@ -211,6 +214,9 @@ pub struct StageIvars {
     /// a newer layout has already settled.
     held_frame: Cell<Option<NSRect>>,
     motion_generation: Cell<u64>,
+    /// The pages' corner, where the window asked for one of its own: 0 in a
+    /// flush window. `None` keeps `PAGE_RADIUS`.
+    page_radius: Cell<Option<f64>>,
 }
 
 define_class!(
@@ -946,6 +952,62 @@ impl ContentStage {
         }
     }
 
+    /// Rounds the pages by `radius`, or by `PAGE_RADIUS` without one; a
+    /// flush window's are square. A slide's cut, the paint covers and the
+    /// working glow read the corner from the page, so they follow it.
+    pub fn set_page_radius(&self, radius: Option<f64>) {
+        let radius = radius
+            .filter(|radius| radius.is_finite())
+            .map(|radius| radius.max(0.0));
+        if self.ivars().page_radius.replace(radius) == radius {
+            return;
+        }
+        let pages: Vec<Retained<NSView>> = self
+            .ivars()
+            .views
+            .try_borrow()
+            .map(|views| views.values().map(|host| host.view.clone()).collect())
+            .unwrap_or_default();
+        for page in &pages {
+            self.round_page(page);
+        }
+        let covers: Vec<Retained<NSView>> = self
+            .ivars()
+            .covers
+            .try_borrow()
+            .map(|covers| covers.values().map(|cover| cover.view.clone()).collect())
+            .unwrap_or_default();
+        for cover in covers {
+            if let Some(layer) = cover.layer() {
+                layer.setCornerRadius(self.page_radius());
+            }
+        }
+    }
+
+    fn page_radius(&self) -> f64 {
+        self.ivars().page_radius.get().unwrap_or(PAGE_RADIUS)
+    }
+
+    /// Gives a page this window's corner. A page WebKit holds fullscreen is
+    /// square there, and takes the corner when it comes back.
+    fn round_page(&self, page: &NSView) {
+        if super::fullscreen::in_transition(page) {
+            return;
+        }
+        let Some(layer) = page.layer() else {
+            return;
+        };
+        let radius = self.page_radius();
+        if layer.cornerRadius() == radius {
+            return;
+        }
+        layer.setCornerRadius(radius);
+        #[cfg(feature = "agentic-browser")]
+        if let Some(page) = page.downcast_ref::<wry::WryWebView>() {
+            super::page_glow::reshape(page);
+        }
+    }
+
     pub fn retire(&self) {
         self.ivars().pointer_cover.take();
         self.ivars().stage_retry_terminal.set(true);
@@ -989,6 +1051,7 @@ impl ContentStage {
             },
         );
         drop(views);
+        self.round_page(&view);
         self.bump_layout_epoch();
         // `addSubview:` can synchronously enter AppKit callbacks. Native work
         // happens only after the view registry borrow has been released.
@@ -1051,6 +1114,9 @@ impl ContentStage {
         if super::fullscreen::in_transition(&view) {
             return true;
         }
+        // WebKit gave back the corner the page had going in, which a change
+        // of look since may have outdated.
+        self.round_page(&view);
         // SAFETY: retained parent access on the AppKit main thread.
         let home = unsafe { view.superview() }
             .as_deref()

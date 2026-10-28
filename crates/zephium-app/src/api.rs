@@ -506,6 +506,9 @@ pub enum Command {
         raised: bool,
         rect: Rect,
     },
+    /// Flush, the page meets the chrome and the window's edges with no gutter
+    /// and square corners; otherwise it keeps its gutters and rounded corners.
+    SetChromeFlush(bool),
     /// Whether the expanded sidebar is on screen to show a page-permission
     /// prompt under its address field.
     SetPagePermissionCardHost(bool),

@@ -565,9 +565,17 @@
     }
   }
 
+  /* Flush against the window and the page, the column keeps the gutter's
+     room inside its own edge; --chrome-inset is nothing while the window
+     keeps a gutter of its own. */
+  .browser-sidebar:not([data-hidden]) {
+    padding: var(--chrome-inset);
+  }
+
   /* Hidden, the column is a card that waits beside the window and slides
      over the page. It wears the sky's frost, a picture stretched rather than
-     a blur drawn, so bringing it out costs one transform. */
+     a blur drawn, so bringing it out costs one transform. The flat look sets
+     a ground and drops the shadow (axes/look.css): a bordered panel. */
   .browser-sidebar[data-hidden] {
     position: absolute;
     inset-block: 8px;
@@ -580,8 +588,8 @@
     padding-inline: 8px;
     padding-block-end: 8px;
     border-radius: var(--content-radius);
-    background: var(--sidebar-frost) center / cover;
-    box-shadow: var(--shadow-overlay);
+    background: var(--sidebar-card-ground, var(--sidebar-frost) center / cover);
+    box-shadow: var(--sidebar-card-shadow, var(--shadow-overlay));
     translate: calc(-100% - 24px) 0;
   }
 
@@ -643,7 +651,7 @@
     inset: 0;
     z-index: -1;
     border-radius: var(--content-radius);
-    background: var(--sidebar-frost) center / cover;
+    background: var(--sidebar-card-ground, var(--sidebar-frost) center / cover);
     pointer-events: none;
     transition: opacity var(--motion-page) var(--ease-out);
   }

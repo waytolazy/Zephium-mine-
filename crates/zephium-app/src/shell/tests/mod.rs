@@ -800,6 +800,10 @@ impl Engine for FakeEngine {
         self.log(format!("raise@{window} {raised}"));
         self.native_admission()
     }
+    fn set_page_radius(&self, window: WindowId, radius: Option<f64>) -> NativeDispatch {
+        self.log(format!("page-radius@{window} {radius:?}"));
+        self.native_admission()
+    }
     fn hint_stage_motion(
         &self,
         window: WindowId,

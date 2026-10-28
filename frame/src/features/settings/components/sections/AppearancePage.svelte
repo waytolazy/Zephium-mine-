@@ -96,6 +96,14 @@
   }
   onDestroy(writeTint);
 
+  // Flat covers the glass, so choosing it lets the glass go too; going back
+  // to soft leaves the material as it is. One write after the other.
+  async function chooseLook(value: string) {
+    await preferences.set("ui.look", value);
+    if (value === "flat" && preferences.value("ui.look") === "flat")
+      await preferences.set("ui.material", "none");
+  }
+
   let codeFontOptions = $derived([
     { value: "system", label: m.look_code_system() },
     ...codeFonts
@@ -122,6 +130,23 @@
 </SettingsGroup>
 
 <SettingsGroup title={m.settings_layout()}>
+  <SettingsRow
+    settingId="appearance.look"
+    title={m.settings_look()}
+    description={m.settings_look_desc()}
+  >
+    <SegmentedControl
+      label={m.settings_look()}
+      size="compact"
+      value={preferences.value("ui.look")}
+      disabled={preferences.saving()}
+      options={[
+        { value: "soft", label: m.settings_look_soft() },
+        { value: "flat", label: m.settings_look_flat() },
+      ]}
+      onchange={(v) => void chooseLook(v)}
+    />
+  </SettingsRow>
   <PreferenceSelect id="appearance.layout" preference="ui.tab-layout" />
   {#if preferences.value("ui.tab-layout") === "horizontal"}
     <PreferenceSwitch id="appearance.bookmarks-bar" preference="ui.bookmarks-bar" />

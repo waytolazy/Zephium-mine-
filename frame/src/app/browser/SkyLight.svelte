@@ -55,8 +55,9 @@
     --sky-edge-strength: var(--sky-night-edge-strength);
   }
 
+  /* The flat look takes none of it (--sky-light is 0 there). */
   .sky-light[data-shown] {
-    opacity: 1;
+    opacity: var(--sky-light);
     transition-duration: 320ms;
     transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   }

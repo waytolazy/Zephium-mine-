@@ -146,8 +146,8 @@ pub const HIDDEN_SHADOW_REACH: f64 = 64.0;
 pub const HIDDEN_CARD_INSET: f64 = 8.0;
 
 /// How far from the window's left the card ends, given the width of the
-/// chrome a hidden sidebar keeps beneath the page: the column and its
-/// gutter, the shadow's reach, and the card's padding beyond the column.
+/// chrome a hidden sidebar keeps beneath the page: the column and the card's
+/// inset, the shadow's reach, and the card's padding beyond the column.
 pub fn hidden_card_edge(chrome_width: f64) -> f64 {
     (chrome_width - HIDDEN_SHADOW_REACH + 2.0 * HIDDEN_CARD_INSET).max(0.0)
 }
@@ -196,8 +196,10 @@ fn sidebar(win: Size, m: Metrics, content_present: bool) -> Layout {
 
     // Hidden, the column keeps its width beneath the page, so it can come
     // over it without laying out again, and the page starts at the gutter.
+    // The card keeps its inset where a flush window has no gutter, so the
+    // chrome beneath it is measured from the inset.
     let chrome_width = if m.sidebar_hidden {
-        (p + m.sidebar_width + HIDDEN_SHADOW_REACH).min(win.width)
+        (HIDDEN_CARD_INSET + m.sidebar_width + HIDDEN_SHADOW_REACH).min(win.width)
     } else {
         p + m.sidebar_width
     };
@@ -461,6 +463,53 @@ mod tests {
         );
         let tiny = hidden_card(Size::new(4.0, 40.0), Mode::TopBar, BAR);
         assert_eq!((tiny.width, tiny.height), (0.0, 0.0));
+    }
+
+    const FLUSH: Metrics = Metrics {
+        padding: 0.0,
+        gap: 0.0,
+        ..BAR
+    };
+
+    #[test]
+    fn a_flush_page_meets_the_chrome_and_the_windows_edges() {
+        let window = Size::new(1200.0, 800.0);
+        let beside = compute(window, Mode::Sidebar, FLUSH, true);
+        assert_eq!(beside.chrome, Rect::new(0.0, 0.0, 240.0, 800.0));
+        assert_eq!(beside.content, Some(Rect::new(240.0, 0.0, 960.0, 800.0)));
+        let below = compute(window, Mode::TopBar, FLUSH, true);
+        assert_eq!(below.content, Some(Rect::new(240.0, 40.0, 960.0, 760.0)));
+        let hidden = Metrics {
+            sidebar_hidden: true,
+            ..FLUSH
+        };
+        let alone = compute(window, Mode::Sidebar, hidden, true);
+        assert_eq!(alone.content, Some(Rect::new(0.0, 0.0, 1200.0, 800.0)));
+        let under = compute(window, Mode::TopBar, hidden, true);
+        assert_eq!(under.content, Some(Rect::new(0.0, 40.0, 1200.0, 760.0)));
+    }
+
+    #[test]
+    fn a_flush_window_keeps_the_card_floating_at_its_inset() {
+        let window = Size::new(1200.0, 800.0);
+        for mode in [Mode::Sidebar, Mode::TopBar] {
+            assert_eq!(
+                hidden_card(window, mode, FLUSH),
+                hidden_card(window, mode, BAR)
+            );
+        }
+        assert_eq!(
+            hidden_card(window, Mode::TopBar, FLUSH),
+            Rect::new(8.0, 48.0, 256.0, 744.0)
+        );
+        // The chrome beneath a hidden column still reaches past the card.
+        let hidden = Metrics {
+            sidebar_hidden: true,
+            ..FLUSH
+        };
+        let chrome = compute(window, Mode::Sidebar, hidden, true).chrome;
+        let card = hidden_card(window, Mode::Sidebar, hidden);
+        assert_eq!(hidden_card_edge(chrome.width), card.x + card.width);
     }
 
     #[test]

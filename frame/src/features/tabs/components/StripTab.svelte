@@ -167,6 +167,10 @@
     color: var(--color-text);
   }
 
+  .strip-tab:not([data-selected="true"]):has(> .strip-open:active) {
+    background: var(--row-pressed);
+  }
+
   .strip-tab[data-selected="true"] {
     background: var(--row-active);
     color: var(--color-row-current, var(--color-text));
@@ -263,6 +267,10 @@
   .strip-close:hover {
     background: var(--row-pressed);
     color: var(--color-text);
+  }
+
+  .strip-close:active {
+    background: var(--color-fill-pressed);
   }
 
   :global([data-close-buttons="always"]) .strip-close,

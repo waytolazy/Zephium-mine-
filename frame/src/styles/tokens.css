@@ -348,6 +348,7 @@
   --radius-card: 18px; /* a group of rows */
   --radius-panel: 22px; /* a floating sheet */
   --radius-capsule: 999px; /* only what is genuinely a pill, a disc or a hairline cap */
+  --radius-pill: var(--radius-capsule); /* a pill the flat look squares off: the bar's field */
 
   /* The shine family's corner: buttons, select triggers and every text input. */
   --radius-shine: var(--radius-control-compact);
@@ -358,6 +359,12 @@
      live page occupy the same shape. Changing one requires changing both. */
   --content-radius: 12px;
   --content-radius-windows: 8px; /* how Windows rounds a page, and so a card cut over it */
+
+  /* The window's gutter round the chrome and the page, native's padding and
+     gap, and what the chrome keeps inside its own edge when the window keeps
+     none. The flat look (axes/look.css) trades one for the other. */
+  --window-gutter: 8px;
+  --chrome-inset: 0px;
 
   /* Traffic lights sit at window (7, 22) and the chrome WebView starts at the
      8px window padding, so within the chrome they span y 14..28 and end near
@@ -379,6 +386,12 @@
   --shadow-field: none;
   --shadow-field-focus: inset 0 0 0 1px var(--color-field-ring);
   --shadow-raise: inset 0 0 0 1px rgb(255 255 255 / 0.05), inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+
+  /* The address field's edge, and the rule along the top bar's foot. On the
+     glass the field's fill is its edge and the page stands a gap below the
+     bar, so neither draws a line; the flat look draws both. */
+  --address-edge: none;
+  --top-bar-rule: none;
   --shadow-track: inset 0 1px 2px rgb(0 0 0 / 0.22), inset 0 0 0 1px rgb(0 0 0 / 0.08);
 
   /* The thumb is the one moving part that genuinely sits above its track, and
@@ -426,6 +439,15 @@
 
   /* Light crossing the name on the new tab as it arrives. */
   --color-glint: rgb(255 255 255 / 0.34);
+
+  /* How much of the sky's light the window takes beside a new tab. */
+  --sky-light: 1;
+
+  /* What a menu blurs of whatever is under its translucent ground. */
+  --menu-backdrop: blur(24px);
+
+  /* The plain new tab's field: a plate a step above the page. */
+  --color-page-field: var(--color-surface);
 
   /* A small control riding the corner of something else. */
   --shadow-badge: 0 0 0 0.5px var(--color-border-strong), 0 1px 3px rgb(0 0 0 / 0.18);

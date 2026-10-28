@@ -1042,6 +1042,29 @@ impl Shell {
                     .engine
                     .raise_chrome(id, raised, rect, RaisedShape::Panel, false);
             }
+            Command::SetChromeFlush(flush) => {
+                let Some(win) = self.windows.focused_mut() else {
+                    return;
+                };
+                if win.flush == flush {
+                    return;
+                }
+                win.flush = flush;
+                // Flush closes the gutters round the page; otherwise they are
+                // what every window starts with.
+                let soft = layout::Metrics::default();
+                (win.metrics.padding, win.metrics.gap) = if flush {
+                    (0.0, 0.0)
+                } else {
+                    (soft.padding, soft.gap)
+                };
+                let id = win.id;
+                // The corners change before the page moves, so a slide's cut
+                // is already the new shape.
+                let _ = self.engine.set_page_radius(id, flush.then_some(0.0));
+                let _ = self.engine.hint_stage_motion(id, StageMotion::Slide);
+                let _ = self.relayout_with(true);
+            }
             Command::SetPagePermissionCardHost(available) => {
                 self.set_page_permission_card_host(available)
             }

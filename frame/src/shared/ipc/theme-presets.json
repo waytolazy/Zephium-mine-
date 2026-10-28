@@ -19,6 +19,24 @@
   },
   {
     "dark": {
+      "accent": "#bfbfc4",
+      "bg": "#121214",
+      "fg": "#e9e9ec"
+    },
+    "ground": {
+      "dark": "#171719",
+      "light": "#e9e9ea"
+    },
+    "id": "mono",
+    "light": {
+      "accent": "#3a3a3f",
+      "bg": "#f4f4f5",
+      "fg": "#1c1c1e"
+    },
+    "name": "Mono"
+  },
+  {
+    "dark": {
       "accent": "#8fa8f2",
       "bg": "#1c1b19",
       "fg": "#eeebe4"

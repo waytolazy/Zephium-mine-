@@ -18,8 +18,9 @@
      the desktop under glass, our own page under none. No saturation boost: the
      platform's own materials use one to keep colour alive behind frosted
      white, but this panel is graphite by design, and all a boost does here is
-     pull whatever hue the wallpaper happens to have up into it. */
-  backdrop-filter: blur(24px);
+     pull whatever hue the wallpaper happens to have up into it. The flat
+     look's menus are solid and blur nothing. */
+  backdrop-filter: var(--menu-backdrop);
   box-shadow: var(--shadow-menu), var(--shine-top);
   outline: none;
   overflow: hidden;

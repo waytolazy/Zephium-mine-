@@ -15,13 +15,14 @@
  */
 
 /* Material activates only after native capability discovery, so an absent
-   attribute keeps the bootstrap document byte-for-byte opaque. */
-:root:not([data-material="none"])[data-material],
-:root:not([data-material="none"])[data-material] #root {
+   attribute keeps the bootstrap document byte-for-byte opaque. The flat look
+   covers whatever is installed with its own ground (look.css). */
+:root:not([data-material="none"], [data-look="flat"])[data-material],
+:root:not([data-material="none"], [data-look="flat"])[data-material] #root {
   background: transparent;
 }
 
-:root:not([data-material="none"])[data-material] body {
+:root:not([data-material="none"], [data-look="flat"])[data-material] body {
   background: var(--material-window-ground, transparent);
 }
 

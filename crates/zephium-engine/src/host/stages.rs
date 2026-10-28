@@ -9,7 +9,7 @@ use wry::WebView;
 use zephium_core::geometry::Rect;
 use zephium_core::ids::{ItemId, WindowId};
 use zephium_core::ports::engine::{EngineEvent, StageMotion};
-use zephium_core::split::Pane;
+use zephium_core::split::{Pane, GAP};
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use super::dispatch::seal_ingress;
@@ -29,8 +29,6 @@ use {
 
 #[cfg(target_os = "windows")]
 use {crate::platform::imp::Stage, windows::Win32::Foundation::HWND};
-
-const GAP: f64 = 8.0;
 
 fn should_seed_stage_readiness(
     inserted: bool,
@@ -379,6 +377,15 @@ impl EngineHost {
             }
             #[cfg(target_os = "windows")]
             stage.raise_chrome(raised, rect, shape, slide);
+        }
+    }
+
+    /// The corner of `window`'s pages, kept by its stage for the pages it
+    /// is given later too: `None` for the platform's own.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub(crate) fn set_page_radius(&mut self, window: WindowId, radius: Option<f64>) {
+        if let Some(stage) = self.ensure_stage(window) {
+            stage.set_page_radius(radius);
         }
     }
 

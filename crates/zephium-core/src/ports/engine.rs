@@ -834,6 +834,12 @@ pub trait Engine {
     ) -> NativeDispatch {
         NativeDispatch::Unsupported
     }
+    /// The corner radius of `window`'s pages: `Some(0.0)` squares them for a
+    /// flush window, and `None` gives back the platform's own, which the
+    /// engine keeps. Only the corners change; nothing is laid out.
+    fn set_page_radius(&self, _window: WindowId, _radius: Option<f64>) -> NativeDispatch {
+        NativeDispatch::Unsupported
+    }
     /// Asks the next content layout applied to `window` to move rather than
     /// jump, because it follows a deliberate change of the window's shape
     /// and not a resize. Consumed by that layout whether or not it moved

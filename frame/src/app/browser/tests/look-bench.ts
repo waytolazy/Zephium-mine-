@@ -19,7 +19,8 @@ const SITES: Record<string, { title: string; fill: string }> = {
   slack: { title: "Login | Slack", fill: "#4a154b" },
 };
 
-function raster(fill: string): string {
+/** A site's mark as native sends it: a 32px rounded square in one colour. */
+export function raster(fill: string): string {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 32;
   const context = canvas.getContext("2d")!;

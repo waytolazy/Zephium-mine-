@@ -363,6 +363,60 @@ fn divider_drag_updates_ratio_and_projects_strips() {
 }
 
 #[test]
+fn split_panes_keep_their_gutter_in_a_flush_window() {
+    let engine = Arc::new(FakeEngine::default());
+    let strips: Arc<Mutex<Vec<DividerView>>> = Arc::new(Mutex::new(Vec::new()));
+    let screen: Screen = Arc::new(Mutex::new(ItemsState {
+        projection_revision: String::new(),
+        profile: None,
+        spaces: Vec::new(),
+        active_space_id: None,
+        nodes: Vec::new(),
+        tabs: Vec::new(),
+        active: None,
+        split_group: None,
+    }));
+    let (sink, strip_sink) = (screen.clone(), strips.clone());
+    let mut shell = Shell::new(
+        engine.clone(),
+        Arc::new(FakeStore::default()),
+        Arc::new(FakeChrome),
+        Box::new(move |p| match p {
+            Projection::Layout(l) => *strip_sink.lock().unwrap() = l.dividers,
+            p => apply_projection(&mut sink.lock().unwrap(), p),
+        }),
+    );
+    shell.handle(Command::SetWindowSize(Size::new(1200.0, 800.0)));
+    shell.handle(Command::Bootstrap);
+    let first = active_id(&screen);
+    navigate_and_commit(&mut shell, first, "example.com");
+    shell.handle(Command::Open);
+    let second = active_id(&screen);
+    navigate_and_commit(&mut shell, second, "github.com");
+    shell.handle(Command::SplitWith {
+        other: first,
+        axis: Axis::Row,
+    });
+    shell.handle(Command::SetChromeFlush(true));
+
+    // The page meets the window's edges; the divider between its panes is
+    // still there to take, where the engine leaves its gutter.
+    let region = engine
+        .layout_regions
+        .lock()
+        .unwrap()
+        .last()
+        .copied()
+        .flatten();
+    assert_eq!(region, Some(Rect::new(240.0, 0.0, 960.0, 800.0)));
+    let strips = strips.lock().unwrap().clone();
+    assert_eq!(strips.len(), 1);
+    assert_eq!(strips[0].width, split::GAP);
+    assert_eq!((strips[0].y, strips[0].height), (0.0, 800.0));
+    assert_eq!(strips[0].x, 240.0 + (960.0 - split::GAP) / 2.0);
+}
+
+#[test]
 fn topology_collapse_revokes_a_captured_divider_before_its_path_can_alias() {
     let (mut shell, _engine, screen) = setup();
     shell.handle(Command::Bootstrap);
@@ -393,7 +447,7 @@ fn topology_collapse_revokes_a_captured_divider_before_its_path_can_alias() {
         .content
         .unwrap();
     let local = Rect::new(0.0, 0.0, content.width, content.height);
-    let outer = split::divider_at_path(&tree, local, win.metrics.gap, &[]).unwrap();
+    let outer = split::divider_at_path(&tree, local, split::GAP, &[]).unwrap();
     shell.handle(Command::DividerGrab {
         x: content.x + outer.strip.x + outer.strip.width / 2.0,
         y: content.y + outer.strip.y + 10.0,

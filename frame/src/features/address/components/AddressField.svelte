@@ -324,7 +324,7 @@
     bind:clientWidth={fieldWidth}
     style:--address-width={fieldWidth ? `${fieldWidth}px` : undefined}
     class:shadow-[inset_0_0_0_1px_var(--color-danger)]={failed}
-    class="address-field h-[34px] items-center gap-2 rounded-row bg-address ps-2.5 pe-1 shadow-[var(--shadow-tile)] transition-[background-color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-out)] [--address-centering:20px] focus-within:bg-address-hover focus-within:shadow-[var(--shadow-field-focus)] hover:bg-address-hover"
+    class="address-field h-[34px] items-center gap-2 rounded-row bg-address ps-2.5 pe-1 shadow-[var(--address-edge)] transition-[background-color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-out)] [--address-centering:20px] focus-within:bg-address-hover focus-within:shadow-[var(--shadow-field-focus)] hover:bg-address-hover"
   >
     {#if !compact && activeCapture && !editing}
       <CaptureControl
@@ -515,7 +515,8 @@
 </form>
 
 <style>
-  /* The bar's pill: a fixed share of the row, reading from its start. */
+  /* The bar's pill, a box in the flat look: a fixed share of the row,
+     reading from its start. */
   form[data-variant="bar"] {
     position: relative;
   }
@@ -523,7 +524,7 @@
   .address-field[data-variant="bar"] {
     inline-size: clamp(200px, 26vw, 360px);
     block-size: 30px;
-    border-radius: var(--radius-capsule);
+    border-radius: var(--radius-pill);
     padding-inline-start: 12px;
   }
 

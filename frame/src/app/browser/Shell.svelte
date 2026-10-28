@@ -371,7 +371,7 @@
 <!-- The chrome view starts at the window's corner in every shape and draws
      the gutter itself, which stays a place to drag the window by. -->
 <div
-  class="shell flex h-screen w-screen p-2"
+  class="shell flex h-screen w-screen p-(--window-gutter)"
   data-tauri-drag-region
   data-layout={bar ? "horizontal" : "vertical"}
   style:--topbar-height={bar ? `${topBarHeight()}px` : undefined}
@@ -594,7 +594,7 @@
       {@const failedTab = tabs.activeTab()}
       {@const failure = failedTab?.failure}
       <!-- A page that could not be shown: the pane says why instead of staying blank. -->
-      <main class="min-w-0 flex-1 ps-2">
+      <main class="min-w-0 flex-1 ps-(--window-gutter)">
         <div class="content-pane h-full w-full overflow-hidden">
           {#if failedTab && failure}<LazyView
               loader={loadNavigationError}
@@ -613,7 +613,7 @@
       page and the new tab never changes the window's shape. The inline start
       inset matches the core layout gap between chrome and content.
     -->
-      <main class="min-w-0 flex-1 ps-2" data-zephium-new-tab>
+      <main class="min-w-0 flex-1 ps-(--window-gutter)" data-zephium-new-tab>
         <!-- New Tab paints its own ground, so its dock can open onto the frame. -->
         <div class="content-pane h-full w-full overflow-hidden" data-ground="own">
           <LazyView
@@ -760,7 +760,7 @@
   .shell[data-layout="horizontal"] > .stage-column {
     grid-row: 2;
     grid-column: 2;
-    padding-block-start: 8px;
+    padding-block-start: var(--window-gutter);
   }
 
   .column-room {

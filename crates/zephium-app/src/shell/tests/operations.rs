@@ -1532,6 +1532,141 @@ fn the_resize_guide_stands_below_a_top_bar() {
     );
 }
 
+fn radii(engine: &FakeEngine) -> Vec<String> {
+    engine
+        .calls()
+        .into_iter()
+        .filter(|call| call.starts_with("page-radius@"))
+        .collect()
+}
+
+#[test]
+fn a_flush_window_puts_the_page_at_its_edges_in_both_shapes() {
+    let (mut shell, engine, screen) = setup();
+    shell.handle(Command::Bootstrap);
+    let id = active_id(&screen);
+    navigate_and_commit(&mut shell, id, "flush.example");
+    let window = shell.windows.focused().unwrap().id;
+
+    shell.handle(Command::SetChromeFlush(true));
+    let win = shell.windows.focused().unwrap();
+    assert!(win.flush);
+    assert_eq!((win.metrics.padding, win.metrics.gap), (0.0, 0.0));
+    // Beside the column, with no gutter round the page.
+    assert_eq!(
+        last_region(&engine),
+        Some(Rect::new(240.0, 0.0, 960.0, 800.0))
+    );
+    // The corners square before the page moves, and the move is a journey.
+    let calls = engine.calls();
+    let squared = calls
+        .iter()
+        .rposition(|call| call == &format!("page-radius@{window} Some(0.0)"))
+        .expect("the engine squares the page");
+    let hinted = calls
+        .iter()
+        .rposition(|call| call == &format!("motion@{window} Slide"))
+        .expect("a change of look is a journey");
+    let laid = calls
+        .iter()
+        .rposition(|call| call.starts_with("layout@"))
+        .unwrap();
+    assert!(squared < hinted && hinted < laid);
+
+    // Below the bar, meeting it; and the whole width once the column hides.
+    shell.handle(Command::SetChromeLayout {
+        top_bar: Some(40.0),
+    });
+    assert_eq!(
+        last_region(&engine),
+        Some(Rect::new(240.0, 40.0, 960.0, 760.0))
+    );
+    shell.handle(Command::SetSidebarHidden(true));
+    assert_eq!(
+        last_region(&engine),
+        Some(Rect::new(0.0, 40.0, 1200.0, 760.0))
+    );
+    // The card still floats at its inset, beneath the bar.
+    shell.handle(Command::PeekSidebar {
+        peek: true,
+        slide: false,
+    });
+    assert_eq!(
+        engine.raised.lock().unwrap().last().copied(),
+        Some((true, Rect::new(8.0, 48.0, 256.0, 744.0), RaisedShape::Card))
+    );
+
+    shell.handle(Command::SetChromeFlush(false));
+    let win = shell.windows.focused().unwrap();
+    assert!(!win.flush);
+    let soft = layout::Metrics::default();
+    assert_eq!(
+        (win.metrics.padding, win.metrics.gap),
+        (soft.padding, soft.gap)
+    );
+    assert_eq!(
+        last_region(&engine),
+        Some(Rect::new(8.0, 48.0, 1184.0, 744.0))
+    );
+    assert_eq!(
+        radii(&engine),
+        [
+            format!("page-radius@{window} Some(0.0)"),
+            format!("page-radius@{window} None"),
+        ]
+    );
+}
+
+#[test]
+fn the_same_flush_again_lays_nothing_out() {
+    let (mut shell, engine, screen) = setup();
+    shell.handle(Command::Bootstrap);
+    let id = active_id(&screen);
+    navigate_and_commit(&mut shell, id, "same.example");
+    // Every window starts soft.
+    let before = engine.calls().len();
+    shell.handle(Command::SetChromeFlush(false));
+    assert_eq!(engine.calls().len(), before);
+
+    shell.handle(Command::SetChromeFlush(true));
+    let after = engine.calls().len();
+    let layouts = engine.layout_regions.lock().unwrap().len();
+    shell.handle(Command::SetChromeFlush(true));
+    assert_eq!(engine.calls().len(), after);
+    assert_eq!(engine.layout_regions.lock().unwrap().len(), layouts);
+    assert_eq!(radii(&engine).len(), 1);
+}
+
+#[test]
+fn a_flush_window_stays_flush_when_it_is_resized() {
+    let (mut shell, engine, screen) = setup();
+    shell.handle(Command::Bootstrap);
+    let id = active_id(&screen);
+    navigate_and_commit(&mut shell, id, "resized.example");
+    shell.handle(Command::SetChromeFlush(true));
+    shell.handle(Command::SetWindowSize(Size::new(1000.0, 700.0)));
+    assert!(shell.windows.focused().unwrap().flush);
+    assert_eq!(
+        last_region(&engine),
+        Some(Rect::new(240.0, 0.0, 760.0, 700.0))
+    );
+    // A resize is not a change of look: the corners are asked for once.
+    assert_eq!(radii(&engine).len(), 1);
+}
+
+#[test]
+fn the_resize_guide_meets_a_flush_page() {
+    let (mut shell, engine, _) = setup();
+    shell.handle(Command::Bootstrap);
+    let window = shell.windows.focused().unwrap().id;
+    shell.handle(Command::SetChromeFlush(true));
+    shell.handle(Command::SidebarResizeGuide(Some(240.0)));
+    assert!(engine.calls().contains(&format!(
+        "resize-guide@{window} {:?}",
+        Some(Rect::new(238.0, 0.0, 2.0, 800.0))
+    )));
+}
+
 #[test]
 fn sidebar_resize_guide_does_not_mutate_width_or_layout() {
     let (mut shell, engine, _) = setup();

@@ -4,6 +4,11 @@
 use crate::geometry::Rect;
 use crate::ids::ItemId;
 
+/// The gutter between split panes, where their divider is taken. It is not
+/// the page's gap from the chrome, which a flush window closes; the engine
+/// lays its panes out with this same gutter.
+pub const GAP: f64 = 8.0;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Axis {
     Row,

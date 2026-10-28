@@ -21,6 +21,7 @@ pub const KEYS: &[&str] = &[
     "ui.newtab-focus",
     "ui.tab-layout",
     "ui.bookmarks-bar",
+    "ui.look",
     "onboarding",
     "ai.enabled",
     "work.enabled",
@@ -214,6 +215,8 @@ pub fn value_allowed(key: &str, value: &str) -> bool {
         }
         "ui.newtab-clock-format" => matches!(value, "system" | "12h" | "24h"),
         "ui.tab-layout" => matches!(value, "vertical" | "horizontal"),
+        // `flat` has no glass, gutters or shadows, and square corners.
+        "ui.look" => matches!(value, "soft" | "flat"),
         "ui.language" => LANGUAGES.contains(&value),
         "ui.density" => matches!(value, "comfortable" | "compact"),
         // Retired for `ui.font-size`; still read once, by `migrations`.
@@ -378,6 +381,16 @@ mod tests {
         assert!(value_allowed("ui.bookmarks-bar", "false"));
         for value in ["", "0", "1", "TRUE", " false", "false ", "on"] {
             assert!(!value_allowed("ui.bookmarks-bar", value));
+        }
+    }
+
+    #[test]
+    fn look_is_soft_or_flat() {
+        assert!(KEYS.contains(&"ui.look"));
+        assert!(value_allowed("ui.look", "soft"));
+        assert!(value_allowed("ui.look", "flat"));
+        for value in ["", "Flat", "flat ", "square", "none", "true"] {
+            assert!(!value_allowed("ui.look", value), "{value:?}");
         }
     }
 

@@ -62,6 +62,16 @@ export const fields = {
     description: m.settings_color_scheme_desc,
     initial: "system",
   },
+  "appearance.look": {
+    section: "appearance",
+    label: m.settings_look,
+    description: m.settings_look_desc,
+    initial: "soft",
+    options: [
+      { value: "soft", label: m.settings_look_soft },
+      { value: "flat", label: m.settings_look_flat },
+    ],
+  },
   "appearance.layout": {
     section: "appearance",
     label: m.settings_tab_layout,

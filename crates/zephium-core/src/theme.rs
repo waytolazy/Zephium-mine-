@@ -59,6 +59,13 @@ pub const PRESETS: &[Preset] = &[
         light: seeds(0xf1f1f3, 0x1c1c1f, 0x222226),
         dark: seeds(0x1a1a1d, 0xf4f4f6, 0xededf0),
     },
+    // Plain black-grey with no hue at all, for the flat look.
+    Preset {
+        id: "mono",
+        name: "Mono",
+        light: seeds(0xf4f4f5, 0x1c1c1e, 0x3a3a3f),
+        dark: seeds(0x121214, 0xe9e9ec, 0xbfbfc4),
+    },
     Preset {
         id: "paper",
         name: "Paper",
@@ -468,6 +475,22 @@ mod tests {
         assert_eq!(json.as_array().unwrap().len(), PRESETS.len());
         assert_eq!(json[0]["id"], "zephium");
         assert_eq!(json[0]["ground"]["dark"], "#1f1f22");
-        assert_eq!(json[4]["dark"]["accent"], "#88c0d0");
+        assert_eq!(json[1]["id"], "mono");
+        assert_eq!(json[5]["dark"]["accent"], "#88c0d0");
+    }
+
+    #[test]
+    fn mono_is_a_plain_grey_below_graphite() {
+        let mono = preset("mono").expect("mono preset");
+        assert_eq!(mono.name, "Mono");
+        assert!(theme_allowed("mono"));
+        // No hue to speak of in either mode: blue leads by a breath at most.
+        for light in [false, true] {
+            let [r, g, b] = chrome("mono", None, D, false, light);
+            assert!(r.abs_diff(g) <= 1 && b >= g && b - g <= 3, "{light}: {r} {g} {b}");
+        }
+        // Its dark ground sits below graphite's, nearer black.
+        let dark = chrome("mono", None, D, false, false);
+        assert!(dark[0] < chrome("zephium", None, D, false, false)[0], "{dark:?}");
     }
 }

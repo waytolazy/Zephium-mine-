@@ -3124,6 +3124,30 @@ impl Engine for WebviewEngine {
         }
     }
 
+    fn set_page_radius(&self, window: WindowId, radius: Option<f64>) -> NativeDispatch {
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        {
+            let queued_retirement = self.retirement.clone();
+            let queued_delivery = self.event_delivery.clone();
+            let queued_fatal = self.fatal_security_failure.clone();
+            NativeDispatch::from_scheduled(self.run(move || {
+                if !host::try_with(move |host| host.set_page_radius(window, radius)) {
+                    fail_native_host_admission(
+                        &queued_delivery,
+                        &queued_retirement,
+                        &queued_fatal,
+                        "page-radius update was not admitted by the engine host",
+                    );
+                }
+            }))
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            let _ = (window, radius);
+            NativeDispatch::Unsupported
+        }
+    }
+
     fn zoom(&self, id: ItemId, scale: f64, request: ZoomRequestId) -> NativeDispatch {
         if !valid_page_zoom(scale) {
             return NativeDispatch::Rejected;

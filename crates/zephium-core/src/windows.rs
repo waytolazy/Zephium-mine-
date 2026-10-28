@@ -24,6 +24,9 @@ pub struct Window {
     pub mode: Mode,
     pub size: Size,
     pub metrics: Metrics,
+    /// The page meets the chrome and the window's edges, with no gutter and
+    /// square corners.
+    pub flush: bool,
     pub active: Option<ItemId>,
     pub splits: Option<Pane>,
 }
@@ -56,6 +59,7 @@ impl Windows {
                 mode: Mode::Sidebar,
                 size,
                 metrics: Metrics::default(),
+                flush: false,
                 active: None,
                 splits: None,
             },

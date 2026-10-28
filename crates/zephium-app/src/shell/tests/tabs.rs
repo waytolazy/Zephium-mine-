@@ -279,7 +279,7 @@ fn dragging_over_a_pane_edge_previews_the_split_and_dropping_clears_it() {
     shell.handle(Command::Activate(first));
 
     let win = shell.windows.focused().unwrap();
-    let gap = win.metrics.gap;
+    let gap = zephium_core::split::GAP;
     let region = layout::compute(win.size, win.mode, win.metrics, true)
         .content
         .unwrap();

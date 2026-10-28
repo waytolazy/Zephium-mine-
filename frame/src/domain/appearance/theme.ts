@@ -117,9 +117,15 @@ function render() {
   root.setAttribute("data-code-font", customization.codeFont);
 }
 
-export function applyLayout(axes: { density: "compact" | "comfortable"; contrast: boolean }) {
+export function applyLayout(axes: {
+  density: "compact" | "comfortable";
+  contrast: boolean;
+  /** `ui.look`: flat is the boxy, opaque axis in `styles/axes/look.css`. */
+  look: "soft" | "flat";
+}) {
   document.documentElement.setAttribute("data-density", axes.density);
   document.documentElement.setAttribute("data-contrast", String(axes.contrast));
+  document.documentElement.setAttribute("data-look", axes.look);
 }
 
 function apply() {

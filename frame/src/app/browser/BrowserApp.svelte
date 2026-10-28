@@ -97,11 +97,20 @@
 
   $effect(() => void applyLanguage(preferences.value("ui.language")));
 
+  let look: "soft" | "flat" = $derived(preferences.value("ui.look") === "flat" ? "flat" : "soft");
   $effect(() => {
     theme.applyLayout({
       density: preferences.value("ui.density") === "compact" ? "compact" : "comfortable",
       contrast: preferences.value("ui.contrast") === "true",
+      look,
     });
+  });
+
+  // Flat is a native fact too: the page meets the chrome with no gutter and
+  // square corners. Told once per change, as the shape is.
+  $effect(() => {
+    const next = look;
+    untrack(() => chrome.adoptLook(next));
   });
 
   // A prompt in the sidebar leaves the page and chrome usable; only the

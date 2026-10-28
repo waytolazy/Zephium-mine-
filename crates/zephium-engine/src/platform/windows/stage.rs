@@ -44,6 +44,7 @@ use std::time::{Duration, Instant};
 
 use crate::pane_geometry::rounded_native_size;
 
+/// A page's corner unless its window is flush, and a raised card's always.
 const RADIUS: f64 = 8.0;
 const INDICATOR_RADIUS: f64 = 10.0;
 const INDICATOR_BORDER: f64 = 1.0;
@@ -179,6 +180,9 @@ struct State {
     covers: HashMap<ItemId, (HWND, u64)>,
     /// The page shown fullscreen: square corners, above everything else.
     fullscreen: Option<ItemId>,
+    /// The corner of every other page, in logical points: `RADIUS`, or 0 in
+    /// a flush window.
+    page_radius: f64,
     /// The chrome's host window, once a hidden sidebar's card has needed it.
     chrome: Option<HWND>,
     /// Where the hidden sidebar's card, or a panel of the top bar, stands
@@ -424,6 +428,7 @@ impl Stage {
             caption_moving,
             covers: HashMap::new(),
             fullscreen: None,
+            page_radius: RADIUS,
             chrome: None,
             card: None,
             card_clip: None,
@@ -584,6 +589,31 @@ impl Stage {
             transition,
         );
         drop(previous_transition);
+        schedule_sync(&self.state);
+    }
+
+    /// Rounds the pages by `radius`, or by the stage's own corner without
+    /// one; a flush window's are square. Every page is cut again at its next
+    /// pass, a hidden one when it is next shown.
+    pub fn set_page_radius(&self, radius: Option<f64>) {
+        let Ok(mut state) = self.state.try_borrow_mut() else {
+            return;
+        };
+        let radius = radius
+            .filter(|radius| radius.is_finite())
+            .map_or(RADIUS, |radius| radius.max(0.0));
+        if state.page_radius == radius {
+            return;
+        }
+        state.page_radius = radius;
+        let pages: Vec<ItemId> = state.views.keys().copied().collect();
+        state.dirty.extend(pages);
+        // A raised card's cut keeps whatever of the chrome the old corners
+        // left bare; it is cut again round the new ones.
+        if state.card.is_some() {
+            state.card_clip = None;
+        }
+        drop(state);
         schedule_sync(&self.state);
     }
 
@@ -1405,6 +1435,7 @@ fn sync(state: &Rc<RefCell<State>>) {
         dirty,
         revision,
         fullscreen,
+        page_radius,
         preview,
         caption_offset,
         caption_moving,
@@ -1485,6 +1516,7 @@ fn sync(state: &Rc<RefCell<State>>) {
             dirty,
             state.revision,
             state.fullscreen,
+            state.page_radius,
             preview,
             if state.fullscreen.is_some() {
                 0.0
@@ -1499,7 +1531,7 @@ fn sync(state: &Rc<RefCell<State>>) {
 
     let scale = scale_of(parent);
     let local = Rect::new(0.0, 0.0, size.0, size.1);
-    let radius = ((RADIUS * scale * 2.0).round() as i32).max(1);
+    let radius = page_diameter(page_radius, scale);
     let pane_rects = tree
         .as_ref()
         .map(|tree| split::layout(tree, local, gap))
@@ -1625,6 +1657,16 @@ fn sync(state: &Rc<RefCell<State>>) {
     }
 }
 
+/// The width of a page region's rounded corner, in pixels: none at all for a
+/// square page, which then has no region, as a fullscreen one has none.
+fn page_diameter(radius: f64, scale: f64) -> i32 {
+    if radius > 0.0 {
+        ((radius * scale * 2.0).round() as i32).max(1)
+    } else {
+        0
+    }
+}
+
 /// Keeps the chrome over the pages, cut to the hidden sidebar's card, with
 /// the card's shadow on the pages, for as long as the card is out; and puts
 /// it back as it was when it is not. A fullscreen page stays above all.
@@ -1711,6 +1753,7 @@ fn settle_card(state: &Rc<RefCell<State>>) {
             found
         }
     };
+    // The card keeps its corner in a flush window: it still floats.
     let diameter = ((RADIUS * scale * 2.0).round() as i32).max(1);
     let shown: Vec<PhysicalRect> = pages.iter().filter_map(|(_, rect)| *rect).collect();
     let key = (rect, diameter, shown);
@@ -1896,7 +1939,8 @@ fn apply_native_placement(state: &Rc<RefCell<State>>, placement: &NativePlacemen
         }
     }
     if placement.delta.rounded && placement.radius == 0 {
-        // A fullscreen page is square: drop the region rather than round by zero.
+        // A fullscreen or flush page is square: drop the region rather than
+        // round by zero.
         if unsafe { SetWindowRgn(placement.container, None, true) } == 0 {
             failed = true;
         } else {
@@ -2417,6 +2461,37 @@ mod tests {
             Some((0, 0)),
         );
         assert!(leaving.rounded && leaving.raise && leaving.container_rect);
+    }
+
+    #[test]
+    fn a_flush_page_is_square_and_cut_again_only_for_its_corners() {
+        assert_eq!(super::page_diameter(super::RADIUS, 1.0), 16);
+        assert_eq!(super::page_diameter(super::RADIUS, 1.5), 24);
+        assert_eq!(super::page_diameter(0.0, 2.0), 0);
+        let rounded = AppliedPlacement {
+            window_visible: Some(true),
+            controller_visible: Some(true),
+            container_rect: Some((240, 0, 960, 800)),
+            controller_size: Some((960, 800)),
+            rounded: Some((960, 800, 16)),
+            notified_screen_origin: Some((240, 0)),
+            raised: Some(false),
+        };
+        let squared = placement_delta(
+            rounded,
+            true,
+            Some((240, 0, 960, 800)),
+            super::page_diameter(0.0, 1.0),
+            false,
+            Some((0, 0)),
+        );
+        assert_eq!(
+            squared,
+            PlacementDelta {
+                rounded: true,
+                ..PlacementDelta::default()
+            }
+        );
     }
 
     #[test]

@@ -8,11 +8,17 @@ import { commands } from "$shared/ipc/bindings";
  */
 export type ChromeLayout = "vertical" | "horizontal";
 
+/** How the chrome is drawn: soft has gutters, glass and rounded pages; flat
+ *  lays the page flush against the chrome and the window's edges. */
+export type ChromeLook = "soft" | "flat";
+
 let layout = $state.raw<ChromeLayout>("vertical");
 /** The bar's height in chrome points, from the window's top to the bar's
  *  foot, bookmarks row included. Zero until the bar has been measured. */
 let barHeight = $state.raw(0);
 let published: string | null = null;
+/** Native starts every window soft, so only a change is ever sent. */
+let look: ChromeLook = "soft";
 
 export const chromeLayout = () => layout;
 export const horizontal = () => layout === "horizontal";
@@ -33,6 +39,14 @@ export function adoptLayout(next: ChromeLayout) {
   publish();
 }
 
+/** The stored look reached the chrome. Its tokens are the root's
+ *  (`theme.applyLayout`); the page's gutter and corners are native's. */
+export function adoptLook(next: ChromeLook) {
+  if (next === look) return;
+  look = next;
+  void commands.chromeSetFlush(next === "flat");
+}
+
 /** The bar reports its own height as it is laid out; a vertical chrome has no bar. */
 export function reportBarHeight(height: number) {
   if (!Number.isFinite(height) || height < 0) return;
@@ -47,4 +61,5 @@ export function resetChromeLayout() {
   layout = "vertical";
   barHeight = 0;
   published = null;
+  look = "soft";
 }

@@ -125,30 +125,35 @@
 </header>
 
 <style>
+  /* On the window's own ground. Flat, the page meets its foot, so a rule
+     draws where the two part and the row keeps a little room above it. */
   .top-bar {
     display: flex;
     flex-direction: column;
     grid-row: 1;
     grid-column: 1 / -1;
     min-width: 0;
+    padding-block-end: calc(var(--chrome-inset) / 2);
     color: var(--color-text);
+    box-shadow: var(--top-bar-rule);
     user-select: none;
   }
 
   /* The row's controls centre where the column's head does, on the band
-     the window's own lights are lined up with. */
+     the window's own lights are lined up with. Flush with the window's
+     edges, the bar keeps the gutter's room inside its own. */
   .bar-row {
     display: flex;
     align-items: center;
     gap: 4px;
     block-size: calc(var(--titlebar-height) + 8px);
     padding-block-start: 8px;
-    padding-inline: 6px 0;
+    padding-inline: calc(6px + var(--chrome-inset)) var(--chrome-inset);
     min-width: 0;
   }
 
   .bar-row[data-lights] {
-    padding-inline-start: var(--traffic-light-inset);
+    padding-inline-start: calc(var(--traffic-light-inset) + var(--chrome-inset));
   }
 
   .bar-address {
