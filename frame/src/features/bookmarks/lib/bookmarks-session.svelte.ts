@@ -7,6 +7,12 @@ import type {
 } from "$shared/ipc/bindings";
 import { commands } from "$shared/ipc/bindings";
 
+/** Counts the writes made through any session in this document. Native
+ *  announces no change to the bookmarks, so a view that is not the one writing
+ *  (the bar, with the panel open) reads again when this moves. */
+let writes = $state(0);
+export const bookmarksWrites = () => writes;
+
 const SEARCH_DEBOUNCE_MS = 160;
 /** An index past any folder's end: native places the bookmark last. */
 const APPEND = 0xffff_ffff;
@@ -116,6 +122,7 @@ export class BookmarksSession {
       return false;
     }
     await this.refresh();
+    writes += 1;
     return response.kind === "saved" ? response.id : null;
   }
 

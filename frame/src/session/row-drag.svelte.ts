@@ -27,16 +27,28 @@ type Options = {
 
 /** The tab a drop goes before: the one under the pointer, or the one after it
  *  when the pointer is past its middle, so the end of a row or a list can be
- *  chosen by dropping on the last tab's far half. */
-function placeBefore(over: Element | null, x: number, y: number, dragged: string): string | null {
+ *  chosen by dropping on the last tab's far half. The kept sites and the
+ *  bar's strip run across, so there the middle is read across too, and
+ *  inline-start first: the far half of a right-to-left row is its left one. */
+export function placeBefore(
+  over: Element | null,
+  x: number,
+  y: number,
+  dragged: string,
+): string | null {
   const row = over?.closest<HTMLElement>("[data-zephium-tab-id]");
   if (!row) return null;
   const rect = row.getBoundingClientRect();
-  const sideways = !!over?.closest("[data-essentials-drop]");
-  const after = sideways ? x > rect.left + rect.width / 2 : y > rect.top + rect.height / 2;
+  const strip = over?.closest<HTMLElement>("[data-strip-drop]");
+  const sideways = !!strip || !!over?.closest("[data-essentials-drop]");
+  const rtl = sideways && getComputedStyle(row).direction === "rtl";
+  const middle = rect.left + rect.width / 2;
+  const after = sideways ? (rtl ? x < middle : x > middle) : y > rect.top + rect.height / 2;
   if (!after && row.dataset.zephiumTabId !== dragged) return row.dataset.zephiumTabId ?? null;
+  // The strip's split members sit in a list of their own; what follows the
+  // last of them is the strip's next tab.
   const rows = [
-    ...(row.closest("ul")?.querySelectorAll<HTMLElement>("[data-zephium-tab-id]") ?? []),
+    ...((strip ?? row.closest("ul"))?.querySelectorAll<HTMLElement>("[data-zephium-tab-id]") ?? []),
   ];
   const next = rows
     .slice(rows.indexOf(row) + 1)

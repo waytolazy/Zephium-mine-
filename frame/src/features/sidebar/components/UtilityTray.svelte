@@ -3,10 +3,12 @@
   import { Alert02Icon, Settings05Icon } from "@hugeicons/core-free-icons";
   import Icon from "$shared/ui/Icon";
   import Disclosure from "$shared/ui/Disclosure";
+  import { followPanel } from "$session/chrome-raise.svelte";
 
   let {
     label,
     warning = null,
+    bar = false,
     children,
     onopen,
     onclose,
@@ -15,6 +17,9 @@
     /** What is wrong with the page in front. The glyph then stays in view as
      *  a warning instead of waiting for the pointer. */
     warning?: string | null;
+    /** On the bar across the window's top: always in view, and its panel
+     *  hangs over the page, which the chrome is raised over while it is open. */
+    bar?: boolean;
     /** Told whether the panel is showing. */
     children: Snippet<[boolean]>;
     onopen?: () => void;
@@ -23,17 +28,24 @@
 
   let open = $state(false);
   let body = $state<HTMLElement>();
+  let lower: (() => void) | null = null;
+  // Gone while open, as the layout changes under it: the chrome goes back.
+  $effect(() => () => lower?.());
 
   // The panel takes the keyboard when it opens, so Escape closes it from
   // wherever it was opened, and after a control in it goes.
   function opened() {
     open = true;
     onopen?.();
+    const panel = body?.closest<HTMLElement>(".ui-disclosure-panel");
+    if (bar && panel) lower = followPanel(panel);
     void tick().then(() => body?.focus({ preventScroll: true }));
   }
 
   function closed() {
     open = false;
+    lower?.();
+    lower = null;
     onclose?.();
   }
 </script>
@@ -49,7 +61,9 @@
 <Disclosure
   {label}
   triggerTitle={warning ?? undefined}
-  triggerClass={warning ? "utilities-trigger utilities-warning" : "utilities-trigger"}
+  triggerClass={["utilities-trigger", warning && "utilities-warning", bar && "utilities-in-bar"]
+    .filter(Boolean)
+    .join(" ")}
   panelClass="utilities-panel sidebar-softens"
   align="end"
   onopen={opened}
@@ -99,6 +113,11 @@
       opacity var(--motion-fast) var(--ease-out),
       background-color var(--motion-fast) var(--ease-out),
       color var(--motion-fast) var(--ease-out);
+  }
+
+  /* The bar is always in use, so its tray stays in view. */
+  :global(.utilities-trigger.utilities-in-bar) {
+    opacity: 1;
   }
 
   :global(.utilities-trigger.utilities-warning) {

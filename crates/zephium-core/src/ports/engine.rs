@@ -573,6 +573,17 @@ pub enum StageMotion {
     Arrive,
 }
 
+/// What the chrome comes over the page for, which says how a platform that
+/// cuts the chrome to the rect it is given reads that rect.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RaisedShape {
+    /// A hidden sidebar's card. Its foot follows the window's, keeping the
+    /// card's inset, so a window resized while it is out keeps the column.
+    Card,
+    /// A panel hanging from the top bar: exactly the rect given.
+    Panel,
+}
+
 /// A tab dragged over a pane's edge, shown before it is dropped: the pane's
 /// page slides aside by `shift` without being resized and the tint marks where
 /// the new pane will stand. Rects are relative to the content region; nothing
@@ -807,16 +818,18 @@ pub trait Engine {
         NativeDispatch::Unsupported
     }
     /// Stacks the chrome over the content while a hidden sidebar is shown, or
-    /// back beneath it. Only the stacking changes; nothing is laid out.
-    /// `card` is where the column stands over the page, in window
-    /// coordinates, for a platform whose chrome must be cut to it.
-    /// `slide` follows the card as it slides in or out, rather than cutting
-    /// to it at once.
+    /// a panel of the top bar hangs over the page, or back beneath it. Only
+    /// the stacking changes; nothing is laid out. `rect` is where the card or
+    /// the panel stands over the page, in window coordinates, for a platform
+    /// whose chrome must be cut to it, and `shape` says which it is. `slide`
+    /// follows the card as it slides in or out, rather than cutting to it at
+    /// once.
     fn raise_chrome(
         &self,
         _window: WindowId,
         _raised: bool,
-        _card: Rect,
+        _rect: Rect,
+        _shape: RaisedShape,
         _slide: bool,
     ) -> NativeDispatch {
         NativeDispatch::Unsupported

@@ -17,8 +17,28 @@
   import { keymap } from "$domain/keymap";
   import { acceleratorKeys } from "$shared/lib/accelerator";
   import { IS_MAC } from "$shared/platform";
+  import { followPanel } from "$session/chrome-raise.svelte";
 
-  let { compact = false }: { compact?: boolean } = $props();
+  let {
+    compact = false,
+    bar = false,
+  }: {
+    compact?: boolean;
+    /** At the end of the bar across the window's top: the stack drops from
+     *  the avatar over the page, which the chrome is raised over while it is open. */
+    bar?: boolean;
+  } = $props();
+  let root = $state<HTMLElement>();
+  let lower: (() => void) | null = null;
+  function opened() {
+    const panel = root?.querySelector<HTMLElement>(".ui-disclosure-panel");
+    if (bar && panel) lower = followPanel(panel);
+  }
+  function closed() {
+    lower?.();
+    lower = null;
+  }
+  $effect(() => () => lower?.());
   onMount(() => {
     void profiles.retain();
     return () => profiles.release();
@@ -101,8 +121,10 @@
   tooltip.
 -->
 <div
+  bind:this={root}
   class="shelf"
   data-compact={compact}
+  data-bar={bar || undefined}
   data-morph="profile"
   role="presentation"
   oncontextmenu={nativeMenu}
@@ -112,10 +134,13 @@
     menu
     triggerClass={["case", tools.activeTool() !== null && "case-lit"].filter(Boolean).join(" ")}
     panelClass="shelf-stack sidebar-softens"
+    align={bar ? "end" : "start"}
+    onopen={opened}
+    onclose={closed}
   >
     {#snippet trigger()}{#if foot.face}<ProfileAvatar
           view={foot.face}
-          size={compact ? 36 : 40}
+          size={bar ? 30 : compact ? 36 : 40}
         />{:else}<Icon
           icon={UserIcon}
           size={compact ? 16 : 17}
@@ -468,6 +493,24 @@
   .shelf[data-compact="true"] :global(.shelf-item) {
     justify-content: center;
     padding-inline: 0;
+  }
+
+  /* In the bar the case is one of its controls, and the stack drops from it
+     to the window's end rather than rising out of a dock. */
+  .shelf[data-bar] :global(.case) {
+    width: 30px;
+    height: 30px;
+  }
+
+  .shelf[data-bar] :global(.shelf-stack) {
+    top: calc(100% + 8px);
+    bottom: auto;
+    inset-inline: auto -9px;
+    transform-origin: top right;
+  }
+
+  .shelf[data-bar] :global(.shelf-stack:not([data-open="true"])) {
+    translate: 0 -6px;
   }
 
   @media (forced-colors: active) {

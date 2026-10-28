@@ -107,9 +107,11 @@ impl Shell {
                 })
             });
         let chrome_layout = layout::compute(win.size, win.mode, win.metrics, chrome_present);
+        // Under a top bar the chrome is the whole window beneath the page in
+        // every shape, and follows the window as an empty tab's does.
         if !self.chrome.position(ChromeFrame {
             rect: chrome_layout.chrome,
-            fill_width: chrome_layout.content.is_none(),
+            fill_width: chrome_layout.content.is_none() || win.mode == layout::Mode::TopBar,
             travel,
         }) {
             return NativeDispatch::Rejected;

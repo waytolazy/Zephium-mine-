@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const native = vi.hoisted(() => ({
   width: vi.fn(async (_width: number | null, _travel: boolean, _revision: number | null) => {}),
   hidden: vi.fn(async (_hidden: boolean) => {}),
+  save: vi.fn(async (_key: string, _value: string) => ({ operation_id: null, accepted: true })),
+  layout: vi.fn(async (_height: number | null) => {}),
 }));
 
 vi.mock("$shared/ipc/bindings", async () => {
@@ -10,8 +12,9 @@ vi.mock("$shared/ipc/bindings", async () => {
   return mockBindings({
     sidebarSetWidth: native.width,
     sidebarSetHidden: native.hidden,
-    settingSet: vi.fn(async () => ({ operation_id: null, accepted: true })),
+    settingSet: native.save,
     settingGet: vi.fn(async () => null),
+    chromeSetLayout: native.layout,
   });
 });
 
@@ -32,7 +35,13 @@ const {
   setPanelExtent,
   sidebarMode,
   toggleMode,
+  isHidden,
+  sidebarPinned,
+  pinSidebar,
+  followLayout,
+  expandBriefly,
 } = await import("../sidebar-mode.svelte");
+const { adoptLayout } = await import("../chrome-layout.svelte");
 
 describe("resolveDragWidth", () => {
   it("puts the column away below the threshold", () => {
@@ -220,5 +229,76 @@ describe("the stored preference catching up with a toggle", () => {
       false,
     );
     vi.useRealTimers();
+  });
+});
+
+describe("with the tabs across the top", () => {
+  const hidden = () => native.hidden.mock.calls.at(-1)?.[0];
+  const across = () => {
+    adoptLayout("horizontal");
+    followLayout();
+  };
+
+  afterEach(() => {
+    adoptLayout("vertical");
+    followLayout();
+    holdShown(false);
+  });
+
+  it("keeps the column beneath the page whatever shape was chosen for it", () => {
+    const shape = sidebarMode();
+    across();
+    expect(isHidden()).toBe(true);
+    expect(hidden()).toBe(true);
+    expect(native.layout).toHaveBeenLastCalledWith(0);
+    expect(sidebarMode()).toBe(shape);
+  });
+
+  it("pins the column beside the page on the toggle, never saving a shape", () => {
+    across();
+    const shape = sidebarMode();
+    const saves = native.save.mock.calls.length;
+    toggleMode();
+    expect(sidebarPinned()).toBe(true);
+    expect(isHidden()).toBe(false);
+    expect(hidden()).toBe(false);
+    expect((native.width.mock.calls.at(-1) as unknown[])[1]).toBe(true);
+    toggleMode();
+    expect(sidebarPinned()).toBe(false);
+    expect(hidden()).toBe(true);
+    expect(sidebarMode()).toBe(shape);
+    expect(native.save.mock.calls).toHaveLength(saves);
+  });
+
+  it("stands the column out while a tool holds it, and lets it go after", () => {
+    across();
+    holdShown(true);
+    expect(hidden()).toBe(false);
+    holdShown(false);
+    expect(hidden()).toBe(true);
+  });
+
+  it("forgets the pin as the tabs go back into the column", () => {
+    across();
+    pinSidebar(true);
+    adoptLayout("vertical");
+    followLayout();
+    expect(sidebarPinned()).toBe(false);
+    expect(native.layout).toHaveBeenLastCalledWith(null);
+    expect(isHidden()).toBe(sidebarMode() === "hidden");
+  });
+
+  it("shows the column briefly with a pin only that showing takes back", () => {
+    across();
+    const restore = expandBriefly();
+    expect(isHidden()).toBe(false);
+    restore();
+    expect(isHidden()).toBe(true);
+
+    // A pin the person makes meanwhile is theirs: the showing leaves it.
+    const again = expandBriefly();
+    pinSidebar(true);
+    again();
+    expect(sidebarPinned()).toBe(true);
   });
 });

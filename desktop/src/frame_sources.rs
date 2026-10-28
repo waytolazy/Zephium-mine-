@@ -25,5 +25,9 @@ pub const SRC_FEATURES_SIDEBAR_TABS_TABROW_SVELTE: &str =
     include_str!("../../frame/src/features/tabs/components/TabRow.svelte");
 pub const SRC_FEATURES_SIDEBAR_TABS_SPLITGROUPROW_SVELTE: &str =
     include_str!("../../frame/src/features/tabs/components/SplitGroupRow.svelte");
+pub const SRC_FEATURES_TABS_STRIPTAB_SVELTE: &str =
+    include_str!("../../frame/src/features/tabs/components/StripTab.svelte");
+pub const SRC_FEATURES_TABS_TABSTRIP_SVELTE: &str =
+    include_str!("../../frame/src/features/tabs/components/TabStrip.svelte");
 pub const SRC_SHARED_LIB_LOCALE_SVELTE_TS: &str =
     include_str!("../../frame/src/shared/lib/locale.svelte.ts");

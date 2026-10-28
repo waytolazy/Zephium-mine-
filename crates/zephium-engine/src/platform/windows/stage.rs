@@ -36,7 +36,7 @@ use wry::WebViewExtWindows;
 
 use zephium_core::geometry::Rect;
 use zephium_core::ids::ItemId;
-use zephium_core::ports::engine::{DropPreview, StageMotion};
+use zephium_core::ports::engine::{DropPreview, RaisedShape, StageMotion};
 use zephium_core::split::{self, Pane};
 
 use crate::motion_curve::EMPHASIZED;
@@ -181,9 +181,10 @@ struct State {
     fullscreen: Option<ItemId>,
     /// The chrome's host window, once a hidden sidebar's card has needed it.
     chrome: Option<HWND>,
-    /// Where the hidden sidebar's card stands over the page, while the
-    /// chrome is up for it, and what has been cut to for it.
-    card: Option<Rect>,
+    /// Where the hidden sidebar's card, or a panel of the top bar, stands
+    /// over the page while the chrome is up for it, and what has been cut to
+    /// for it.
+    card: Option<(Rect, RaisedShape)>,
     card_clip: Option<(PhysicalRect, i32, Vec<PhysicalRect>)>,
     /// The card on its way in or out, and the timer that steps the cut.
     card_motion: Option<CardMotion>,
@@ -670,13 +671,16 @@ impl Stage {
     }
 
     /// Brings the chrome over the pages inside the card of a hidden sidebar,
-    /// or puts it back beneath them. With `slide`, the cut follows the card
-    /// in, or out before the chrome goes back beneath; a card turned back
-    /// part way goes from where it has got to.
-    pub fn raise_chrome(&self, raised: bool, card: Rect, slide: bool) {
+    /// or a panel of the top bar, or puts it back beneath them. With `slide`,
+    /// the cut follows the card in, or out before the chrome goes back
+    /// beneath; a card turned back part way goes from where it has got to. A
+    /// panel only ever cuts at once.
+    pub fn raise_chrome(&self, raised: bool, rect: Rect, shape: RaisedShape, slide: bool) {
         let Ok(mut state) = self.state.try_borrow_mut() else {
             return;
         };
+        let slide = slide && shape == RaisedShape::Card;
+        let card = (rect, shape);
         let now = Instant::now();
         let away = match (state.card, state.card_motion) {
             (None, _) => 1.0,
@@ -1664,7 +1668,7 @@ fn settle_card(state: &Rc<RefCell<State>>) {
     if moving {
         step_card(state);
     }
-    let Some(card) = card else {
+    let Some((card, shape)) = card else {
         if clip.is_some() {
             let lowered = chrome.is_none_or(|chrome| {
                 super::sidebar_card::is_live(chrome)
@@ -1684,9 +1688,12 @@ fn settle_card(state: &Rc<RefCell<State>>) {
     if unsafe { GetClientRect(parent, &mut client) }.is_err() {
         return;
     }
-    let Some(placed) =
-        crate::card_geometry::card_pixels(card, (client.right, client.bottom), scale)
-    else {
+    let client_size = (client.right, client.bottom);
+    let placed = match shape {
+        RaisedShape::Card => crate::card_geometry::card_pixels(card, client_size, scale),
+        RaisedShape::Panel => crate::card_geometry::panel_pixels(card, client_size, scale),
+    };
+    let Some(placed) = placed else {
         return;
     };
     let travel = ((card.width + CARD_AWAY) * scale * away).round() as i32;

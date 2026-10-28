@@ -1,6 +1,9 @@
 export { default as SidebarBody } from "./components/SidebarBody.svelte";
 export { default as TabList } from "./components/TabList.svelte";
 export { default as TabRail } from "./components/TabRail.svelte";
+export { default as TabStrip } from "./components/TabStrip.svelte";
+export { default as SpaceBar } from "./components/SpaceBar.svelte";
+export { default as RailSpaces } from "./components/RailSpaces.svelte";
 export const loadTabCapacityState = () => import("./components/TabCapacityState.svelte");
 export const loadNavigationError = () => import("./components/NavigationError.svelte");
 export { sidebarTree } from "./lib/sidebar-model";

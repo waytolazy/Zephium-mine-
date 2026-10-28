@@ -341,6 +341,7 @@
   --radius-swatch: 3px; /* a colour key in a chart's legend or tooltip */
   --radius-inset: 8px; /* a glyph plate or keycap inside something else */
   --radius-row: 12px; /* a row in a column, and a field sharing that column */
+  --radius-tab: min(var(--radius-row), 8px); /* a tab in the top bar's strip, 30px tall */
   --radius-control-compact: 10px; /* a control around 24-26px */
   --radius-control: 14px; /* a control around 30-34px: button, field, select */
   --radius-control-large: 18px; /* a control around 40-46px */
@@ -363,6 +364,10 @@
      x 53. The header centres on that band and clears that extent. */
   --titlebar-height: 32px;
   --traffic-light-inset: 60px;
+
+  /* Windows draws its three caption buttons, 46px each, at the window's
+     top-right; a bar across the top keeps that corner clear for them. */
+  --caption-reserve: 146px;
 
   /* How a control separates from the surface under it, which is a different
      problem in each theme and so a different value, not a different rule. On a

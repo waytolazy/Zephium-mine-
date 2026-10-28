@@ -38,7 +38,7 @@
   <!-- In the row the profile leads; down the rail it closes the column. -->
   <div class="dock-base">
     {#if tools && !compact}<ToolShelf />
-      <span class="dock-rule" aria-hidden="true"></span>{/if}
+      {#if sites}<span class="dock-rule" aria-hidden="true"></span>{/if}{/if}
     {#if sites}<div class="dock-sites-slot">
         {@render sites()}
       </div>{/if}

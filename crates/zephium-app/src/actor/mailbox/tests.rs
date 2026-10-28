@@ -32,6 +32,39 @@ fn sidebar_guide_cleanup_is_reserved_and_not_replaced_by_preview() {
 }
 
 #[test]
+fn the_chromes_shape_and_raise_keep_only_their_latest_fact() {
+    use zephium_core::geometry::Rect;
+    let mut queue = VecDeque::new();
+    for command in [
+        Command::SetChromeLayout {
+            top_bar: Some(40.0),
+        },
+        Command::RaiseChrome {
+            raised: true,
+            rect: Rect::new(300.0, 40.0, 360.0, 420.0),
+        },
+        Command::SetChromeLayout {
+            top_bar: Some(68.0),
+        },
+        Command::RaiseChrome {
+            raised: false,
+            rect: Rect::new(300.0, 40.0, 360.0, 420.0),
+        },
+    ] {
+        assert!(enqueue(&mut queue, command, 8, false).is_ok());
+    }
+    assert_eq!(queue.len(), 2);
+    assert!(matches!(
+        queue[0],
+        Command::SetChromeLayout { top_bar: Some(height) } if height == 68.0
+    ));
+    assert!(matches!(
+        queue[1],
+        Command::RaiseChrome { raised: false, .. }
+    ));
+}
+
+#[test]
 fn foreground_capacity_deadlines_are_bounded_and_wake_before_maintenance() {
     let queue = CommandQueue::new();
     let future = std::time::Instant::now() + std::time::Duration::from_secs(30);

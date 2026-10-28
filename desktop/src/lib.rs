@@ -1833,6 +1833,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             sidebar_peek,
             sidebar_resize,
             sidebar_resize_guide,
+            chrome_set_layout,
+            chrome_raise,
             tab_drag_over,
             resource_call,
             notes::note_call,
@@ -2338,7 +2340,9 @@ const MAX_COMMAND_ID_BYTES: usize = 128;
 const MAX_KEPT_SITE_ID_BYTES: usize = 32;
 const MAX_PROFILE_NAME_BYTES: usize = 256;
 const MAX_WINDOW_COORDINATE: f64 = 1_000_000.0;
-use zephium_core::layout::{MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH};
+use zephium_core::layout::{
+    MAX_SIDEBAR_WIDTH, MAX_TOP_BAR_HEIGHT, MIN_SIDEBAR_WIDTH, MIN_TOP_BAR_HEIGHT,
+};
 
 /// The tab a native context menu was opened for, and the document whose
 /// camera or microphone it showed in use, if any.
@@ -2490,6 +2494,24 @@ fn extension_popup_anchor_in_bounds(
 
 fn sidebar_width_in_bounds(width: f64) -> bool {
     width.is_finite() && (MIN_SIDEBAR_WIDTH..=MAX_SIDEBAR_WIDTH).contains(&width)
+}
+
+fn top_bar_height_in_bounds(height: f64) -> bool {
+    height.is_finite() && (MIN_TOP_BAR_HEIGHT..=MAX_TOP_BAR_HEIGHT).contains(&height)
+}
+
+/// A panel of the top bar as the chrome measured it, in window coordinates.
+/// The shell fits it into the window; here it need only be a real rect.
+fn chrome_raise_rect(x: f64, y: f64, width: f64, height: f64) -> Option<Rect> {
+    // Not a number is in no range, and neither is an infinity.
+    if ![x, y, width, height]
+        .iter()
+        .all(|value| (0.0..=MAX_WINDOW_COORDINATE).contains(value))
+    {
+        return None;
+    }
+    let (x, y) = window_point(x, y)?;
+    Some(Rect::new(x, y, width, height))
 }
 
 fn sidebar_resize_revision(revision: f64) -> Option<u64> {
@@ -5433,6 +5455,43 @@ fn sidebar_resize_guide(
     }
 }
 
+/// The chrome's shape: a top bar of this height over the page, with the
+/// sidebar beneath it, or `null` for the sidebar beside the page alone.
+#[tauri::command]
+#[specta::specta]
+fn chrome_set_layout(caller: WebviewWindow, shell: State<'_, Handle>, top_bar: Option<f64>) {
+    if !authorize(&caller, CallerPolicy::Main, "chrome_set_layout")
+        || top_bar.is_some_and(|height| !top_bar_height_in_bounds(height))
+    {
+        return;
+    }
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    platform::imp::chrome_top_bar(&caller, top_bar.is_some());
+    shell.dispatch(Command::SetChromeLayout { top_bar });
+}
+
+/// Brings the chrome over the page within a rect while a panel of the top
+/// bar hangs there, or puts it back beneath the page.
+#[tauri::command]
+#[specta::specta]
+fn chrome_raise(
+    caller: WebviewWindow,
+    shell: State<'_, Handle>,
+    raised: bool,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) {
+    if !authorize(&caller, CallerPolicy::Main, "chrome_raise") {
+        return;
+    }
+    let Some(rect) = chrome_raise_rect(x, y, width, height) else {
+        return;
+    };
+    shell.dispatch(Command::RaiseChrome { raised, rect });
+}
+
 #[tauri::command]
 #[specta::specta]
 fn tab_drag_over(caller: WebviewWindow, shell: State<'_, Handle>, x: Option<f64>, y: Option<f64>) {
@@ -8065,6 +8124,53 @@ mod tests {
     }
 
     #[test]
+    fn the_top_bars_tab_strip_keeps_the_presentation_barrier_reachable() {
+        let row = crate::frame_sources::SRC_FEATURES_TABS_STRIPTAB_SVELTE;
+        let strip = crate::frame_sources::SRC_FEATURES_TABS_TABSTRIP_SVELTE;
+
+        // Under a top bar the strip is the only tab list, so its rows are the
+        // ones the barrier verifies the presenting tab through. A kept site or
+        // pinned tab is drawn as its mark alone; its title still has to be in
+        // the document, hidden from sight, never unmounted.
+        for sentinel in [
+            "data-zephium-tab-id",
+            "data-zephium-tab-url",
+            "data-zephium-projection-revision",
+            "data-zephium-tab-label",
+        ] {
+            assert_eq!(
+                row.matches(sentinel).count(),
+                1,
+                "strip tab must own exactly one {sentinel} binding"
+            );
+            assert!(
+                !strip.contains(sentinel),
+                "the strip must not duplicate the row-owned {sentinel}"
+            );
+        }
+        assert!(row.contains("data-zephium-tab-id={tab.id}"));
+        assert!(row.contains(r#"data-zephium-tab-url={tab.url ?? ""}"#));
+        assert!(row.contains("data-zephium-projection-revision={tab.projection_revision}"));
+        let label = row
+            .split("<span data-zephium-tab-label")
+            .nth(1)
+            .and_then(|rest| rest.split("</span>").next())
+            .expect("bounded exact title sentinel");
+        assert_eq!(label.matches("{tab.title}").count(), 1);
+        assert!(
+            label.trim_end().ends_with("{tab.title}"),
+            "strip title must be the sentinel's sole child"
+        );
+
+        // Rows are keyed by tab, so a reorder moves a row rather than
+        // handing its sentinels to another tab, and the menu stays native.
+        assert!(strip.contains("{#each units as unit (unit.key)}"));
+        assert!(strip.contains("{#each unit.tabs as tab (tab.id)}"));
+        assert!(strip.contains("event.preventDefault()"));
+        assert!(strip.contains("tabs.openTabMenu(tab.id, event.clientX, event.clientY)"));
+    }
+
+    #[test]
     fn the_sidebar_shape_is_a_bounded_allowlisted_preference() {
         assert!(super::SETTING_KEYS.contains(&"sidebar.mode"));
         assert!(super::setting_value_allowed("sidebar.mode", "default"));
@@ -8088,6 +8194,96 @@ mod tests {
             assert!(
                 zephium_core::commands::get(id).is_some(),
                 "collapsed sidebar menu references an unregistered command: {id}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_top_bar_commands_are_registered_after_the_sidebars_and_main_only() {
+        let source = include_str!("lib.rs");
+        let registered: Vec<&str> = source
+            .split("collect_commands![")
+            .nth(1)
+            .and_then(|rest| rest.split("])").next())
+            .expect("registered command list")
+            .split(',')
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .collect();
+        // The generated bindings follow this order, and the frame's copy of
+        // them was written against it.
+        let guide = registered
+            .iter()
+            .position(|name| *name == "sidebar_resize_guide")
+            .expect("sidebar resize guide is registered");
+        assert_eq!(
+            registered[guide..guide + 3],
+            ["sidebar_resize_guide", "chrome_set_layout", "chrome_raise"]
+        );
+        for name in ["chrome_set_layout", "chrome_raise"] {
+            assert_eq!(registered.iter().filter(|entry| **entry == name).count(), 1);
+            let command = source
+                .split(&format!("fn {name}("))
+                .nth(1)
+                .expect("top bar command")
+                .split("#[tauri::command]")
+                .next()
+                .expect("bounded top bar command");
+            assert!(
+                command.contains(&format!(
+                    "authorize(&caller, CallerPolicy::Main, \"{name}\")"
+                )),
+                "{name} must be the main chrome's alone"
+            );
+        }
+    }
+
+    #[test]
+    fn the_top_bar_height_and_a_raised_panel_are_bounded_at_the_boundary() {
+        use zephium_core::geometry::Rect;
+        use zephium_core::layout::{MAX_TOP_BAR_HEIGHT, MIN_TOP_BAR_HEIGHT};
+
+        assert!(super::top_bar_height_in_bounds(MIN_TOP_BAR_HEIGHT));
+        assert!(super::top_bar_height_in_bounds(40.0));
+        assert!(super::top_bar_height_in_bounds(MAX_TOP_BAR_HEIGHT));
+        for height in [
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            -1.0,
+            MAX_TOP_BAR_HEIGHT + 0.5,
+            10_000.0,
+        ] {
+            assert!(!super::top_bar_height_in_bounds(height), "{height}");
+        }
+
+        assert_eq!(
+            super::chrome_raise_rect(300.0, 40.0, 360.0, 420.0),
+            Some(Rect::new(300.0, 40.0, 360.0, 420.0))
+        );
+        // An empty panel is still a rect; the shell lowers the chrome for it.
+        assert_eq!(
+            super::chrome_raise_rect(0.0, 0.0, 0.0, 0.0),
+            Some(Rect::new(0.0, 0.0, 0.0, 0.0))
+        );
+        for (x, y, width, height) in [
+            (f64::NAN, 40.0, 360.0, 420.0),
+            (300.0, f64::NAN, 360.0, 420.0),
+            (300.0, 40.0, f64::NAN, 420.0),
+            (300.0, 40.0, 360.0, f64::NAN),
+            (300.0, 40.0, f64::INFINITY, 420.0),
+            (300.0, 40.0, 360.0, f64::NEG_INFINITY),
+            (-1.0, 40.0, 360.0, 420.0),
+            (300.0, -1.0, 360.0, 420.0),
+            (300.0, 40.0, -360.0, 420.0),
+            (300.0, 40.0, 360.0, -420.0),
+            (2_000_000.0, 40.0, 360.0, 420.0),
+            (300.0, 40.0, 360.0, 2_000_000.0),
+        ] {
+            assert_eq!(
+                super::chrome_raise_rect(x, y, width, height),
+                None,
+                "({x}, {y}, {width}, {height})"
             );
         }
     }

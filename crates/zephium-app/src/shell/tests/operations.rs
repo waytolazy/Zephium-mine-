@@ -1271,6 +1271,267 @@ fn a_hidden_sidebar_gives_the_page_the_window_and_comes_over_it_on_request() {
     assert!(region.is_some_and(|region| region.x > 8.0));
 }
 
+fn last_region(engine: &FakeEngine) -> Option<Rect> {
+    engine
+        .layout_regions
+        .lock()
+        .unwrap()
+        .last()
+        .copied()
+        .flatten()
+}
+
+#[test]
+fn a_top_bar_moves_the_page_below_it_and_a_new_shape_is_a_journey() {
+    let (mut shell, engine, screen) = setup();
+    shell.handle(Command::Bootstrap);
+    let id = active_id(&screen);
+    navigate_and_commit(&mut shell, id, "bar.example");
+    let window = shell.windows.focused().unwrap().id;
+    let motions = |engine: &FakeEngine| {
+        engine
+            .calls()
+            .into_iter()
+            .filter(|call| call.starts_with("motion@"))
+            .count()
+    };
+    assert_eq!(
+        last_region(&engine),
+        Some(Rect::new(256.0, 8.0, 936.0, 784.0))
+    );
+
+    shell.handle(Command::SetChromeLayout {
+        top_bar: Some(40.0),
+    });
+    assert_eq!(shell.windows.focused().unwrap().mode, layout::Mode::TopBar);
+    // Beside the column and below the bar, across the gap.
+    assert_eq!(
+        last_region(&engine),
+        Some(Rect::new(256.0, 48.0, 936.0, 744.0))
+    );
+    let calls = engine.calls();
+    let hinted = calls
+        .iter()
+        .rposition(|call| call == &format!("motion@{window} Slide"))
+        .expect("a change of shape is a journey");
+    let laid = calls
+        .iter()
+        .rposition(|call| call.starts_with("layout@"))
+        .unwrap();
+    assert!(hinted < laid);
+
+    // The bar growing only moves the page's top; nothing travels.
+    let before = motions(&engine);
+    shell.handle(Command::SetChromeLayout {
+        top_bar: Some(68.0),
+    });
+    assert_eq!(
+        last_region(&engine),
+        Some(Rect::new(256.0, 76.0, 936.0, 716.0))
+    );
+    assert_eq!(motions(&engine), before);
+    // A height native does not admit is held to the bar's range.
+    shell.handle(Command::SetChromeLayout {
+        top_bar: Some(10_000.0),
+    });
+    assert_eq!(
+        shell.windows.focused().unwrap().metrics.top_bar_height,
+        layout::MAX_TOP_BAR_HEIGHT
+    );
+
+    shell.handle(Command::SetChromeLayout { top_bar: None });
+    assert_eq!(shell.windows.focused().unwrap().mode, layout::Mode::Sidebar);
+    assert_eq!(
+        last_region(&engine),
+        Some(Rect::new(256.0, 8.0, 936.0, 784.0))
+    );
+    assert_eq!(motions(&engine), before + 1);
+    // The same shape again lays nothing out.
+    let layouts = engine.layout_regions.lock().unwrap().len();
+    shell.handle(Command::SetChromeLayout { top_bar: None });
+    assert_eq!(engine.layout_regions.lock().unwrap().len(), layouts);
+}
+
+#[test]
+fn a_hidden_column_under_a_top_bar_gives_the_page_the_window_width() {
+    let (mut shell, engine, screen) = setup();
+    shell.handle(Command::Bootstrap);
+    let id = active_id(&screen);
+    navigate_and_commit(&mut shell, id, "bar-hidden.example");
+    shell.handle(Command::SetChromeLayout {
+        top_bar: Some(40.0),
+    });
+    shell.handle(Command::SetSidebarHidden(true));
+    assert_eq!(
+        last_region(&engine),
+        Some(Rect::new(8.0, 48.0, 1184.0, 744.0))
+    );
+
+    // The card comes in beneath the bar, never over it.
+    shell.handle(Command::PeekSidebar {
+        peek: true,
+        slide: true,
+    });
+    assert_eq!(
+        engine.raised.lock().unwrap().last().copied(),
+        Some((true, Rect::new(8.0, 48.0, 256.0, 744.0), RaisedShape::Card))
+    );
+}
+
+#[test]
+fn a_bar_panel_raises_the_chrome_only_under_a_top_bar_and_inside_the_window() {
+    let (mut shell, engine, screen) = setup();
+    shell.handle(Command::Bootstrap);
+    let id = active_id(&screen);
+    navigate_and_commit(&mut shell, id, "panel.example");
+    let window = shell.windows.focused().unwrap().id;
+    let panel = Rect::new(300.0, 40.0, 360.0, 420.0);
+
+    // A column beside the page tiles with it; there is nothing to raise.
+    shell.handle(Command::RaiseChrome {
+        raised: true,
+        rect: panel,
+    });
+    assert!(engine.raised.lock().unwrap().is_empty());
+    assert!(!engine.calls().iter().any(|call| call.starts_with("raise@")));
+
+    shell.handle(Command::SetChromeLayout {
+        top_bar: Some(40.0),
+    });
+    shell.handle(Command::RaiseChrome {
+        raised: true,
+        rect: panel,
+    });
+    shell.handle(Command::RaiseChrome {
+        raised: true,
+        rect: Rect::new(1000.0, 40.0, 360.0, 900.0),
+    });
+    // Nothing of it inside the window: the chrome goes back beneath.
+    shell.handle(Command::RaiseChrome {
+        raised: true,
+        rect: Rect::new(1300.0, 40.0, 100.0, 100.0),
+    });
+    assert_eq!(
+        engine.raised.lock().unwrap().clone(),
+        [
+            (true, panel, RaisedShape::Panel),
+            (
+                true,
+                Rect::new(1000.0, 40.0, 200.0, 760.0),
+                RaisedShape::Panel
+            ),
+            (
+                false,
+                Rect::new(1200.0, 40.0, 0.0, 100.0),
+                RaisedShape::Panel
+            ),
+        ]
+    );
+
+    // Leaving the bar with a panel up puts the chrome back beneath the page.
+    shell.handle(Command::RaiseChrome {
+        raised: true,
+        rect: panel,
+    });
+    shell.handle(Command::SetChromeLayout { top_bar: None });
+    assert_eq!(
+        engine.raised.lock().unwrap().last().map(|raise| raise.0),
+        Some(false)
+    );
+    let raises = engine
+        .calls()
+        .into_iter()
+        .filter(|call| call.starts_with("raise@"))
+        .count();
+    assert_eq!(
+        raises, 5,
+        "the panel that was down asks for no second lowering"
+    );
+    // Beside the page again, a panel is ignored.
+    shell.handle(Command::RaiseChrome {
+        raised: true,
+        rect: panel,
+    });
+    assert_eq!(
+        engine
+            .calls()
+            .into_iter()
+            .filter(|call| call == &format!("raise@{window} true"))
+            .count(),
+        3
+    );
+}
+
+#[test]
+fn under_a_top_bar_the_chrome_fills_the_window_beneath_a_page() {
+    let (mut shell, _, chrome, screen) = setup_with_async_chrome();
+    let queue = CommandQueue::new();
+    shell.self_queue = Some(queue.clone());
+    shell.handle(Command::Bootstrap);
+    while let Some(command) = queue.try_recv() {
+        shell.handle(command);
+    }
+    let id = active_id(&screen);
+    shell.handle(Command::Navigate {
+        id,
+        input: "https://filled.example/".into(),
+    });
+    commit_url(&mut shell, id, "https://filled.example/");
+    shell.handle(Command::Engine(presentation_pending(
+        id,
+        NavigationPresentationId::from_raw(4301),
+        "https://filled.example/",
+    )));
+    chrome.complete_next(true);
+    while let Some(command) = queue.try_recv() {
+        shell.handle(command);
+    }
+    // The first verified page frees the chrome at the next layout. Beside
+    // the page, the column is then the chrome, pinned at its width.
+    shell.handle(Command::SetWindowSize(Size::new(1200.0, 800.0)));
+    let frame = chrome.last_frame().expect("chrome was placed");
+    assert!(!frame.fill_width, "{frame:?}");
+    assert_eq!(frame.rect, Rect::new(0.0, 0.0, 248.0, 800.0));
+
+    shell.handle(Command::SetChromeLayout {
+        top_bar: Some(40.0),
+    });
+    let frame = chrome.last_frame().expect("chrome was placed");
+    assert!(frame.fill_width, "{frame:?}");
+    assert!(frame.travel);
+    assert_eq!(frame.rect, Rect::new(0.0, 0.0, 1200.0, 800.0));
+}
+
+#[test]
+fn the_resize_guide_stands_below_a_top_bar() {
+    let (mut shell, engine, _) = setup();
+    shell.handle(Command::Bootstrap);
+    let window = shell.windows.focused().unwrap().id;
+    shell.handle(Command::SidebarResizeGuide(Some(240.0)));
+    shell.handle(Command::SetChromeLayout {
+        top_bar: Some(40.0),
+    });
+    shell.handle(Command::SidebarResizeGuide(Some(240.0)));
+    let guides: Vec<String> = engine
+        .calls()
+        .into_iter()
+        .filter(|call| call.starts_with("resize-guide@"))
+        .collect();
+    assert_eq!(
+        guides,
+        [
+            format!(
+                "resize-guide@{window} {:?}",
+                Some(Rect::new(246.0, 8.0, 2.0, 784.0))
+            ),
+            format!(
+                "resize-guide@{window} {:?}",
+                Some(Rect::new(246.0, 48.0, 2.0, 744.0))
+            ),
+        ]
+    );
+}
+
 #[test]
 fn sidebar_resize_guide_does_not_mutate_width_or_layout() {
     let (mut shell, engine, _) = setup();

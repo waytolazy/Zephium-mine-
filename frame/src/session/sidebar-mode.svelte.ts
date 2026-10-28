@@ -1,4 +1,5 @@
 import { commands } from "$shared/ipc/bindings";
+import { horizontal } from "./chrome-layout.svelte";
 
 /** Compact is the rail that Work, Tasks and tools put the column into; the
  *  shape a person picks is expanded or hidden. */
@@ -40,16 +41,48 @@ export const sidebarResizeSettlement = () => resizeSettlement;
 
 export const sidebarMode = () => mode;
 export const isCompact = () => mode === "compact";
-export const isHidden = () => mode === "hidden" && !held;
 
 /** A destination that wants the column in view, the rail of Work or a tool,
  *  holds a hidden sidebar out for as long as it is shown. */
 let held = $state.raw(false);
+/**
+ * With the tabs across the top, the bar's toggle stands the column beside
+ * the page instead of changing the shape the person chose for it, which
+ * still applies the moment the tabs go back into the column. A pin lasts as
+ * long as this document: it is a place the column is in, not a preference.
+ */
+let pinned = $state.raw(false);
+/** The pin a brief showing made, so only that showing takes it back. */
+let briefPin: object | null = null;
+
+/** Put away by the person, or always with the tabs across the top. */
+const putAway = () => mode === "hidden" || horizontal();
+/** Beneath the page, waiting as a card, until something stands it beside the page. */
+export const isHidden = () => putAway() && !held && !pinned;
+
 export function holdShown(value: boolean) {
   if (value === held) return;
   held = value;
-  if (mode === "hidden") publish(true);
+  if (putAway()) publish(true);
 }
+
+export const sidebarPinned = () => pinned;
+export function pinSidebar(value: boolean) {
+  briefPin = null;
+  if (value === pinned) return;
+  pinned = value;
+  if (horizontal()) publish(true);
+}
+
+/** The chrome changed shape: a pin belongs to the bar's layout alone, and
+ *  native is told where the column stands in the new one. */
+export function followLayout() {
+  cancelSidebarResize();
+  briefPin = null;
+  pinned = false;
+  publish(true);
+}
+
 export const expanded = () => expandedWidth;
 /** The chrome gap between the rail and an open utility panel. */
 export const PANEL_GAP = 8;
@@ -211,6 +244,19 @@ export function setMode(next: SidebarMode) {
  */
 export function expandBriefly(): () => void {
   cancelSidebarResize();
+  if (horizontal()) {
+    if (pinned || held) return () => {};
+    const pin = {};
+    briefPin = pin;
+    pinned = true;
+    publish(true);
+    return () => {
+      if (briefPin !== pin) return;
+      briefPin = null;
+      pinned = false;
+      publish(true);
+    };
+  }
   const away = mode;
   if (away === "default") return () => {};
   mode = "default";
@@ -225,6 +271,10 @@ export function expandBriefly(): () => void {
 
 export function toggleMode() {
   cancelSidebarResize();
+  if (horizontal()) {
+    pinSidebar(!pinned);
+    return;
+  }
   desiredMode = desiredMode === "default" ? PUT_AWAY : "default";
   setMode(desiredMode);
 }

@@ -1,3 +1,4 @@
+import { tick } from "svelte";
 import { commands } from "$shared/ipc/bindings";
 
 /**
@@ -10,7 +11,9 @@ import { commands } from "$shared/ipc/bindings";
  */
 type Raised = { id: number; rect: DOMRect };
 
-let open: Raised | null = null;
+// Read by the column's card, which shares native's one raised state with
+// these panels and so must stay in while one is raised.
+let open = $state.raw<Raised | null>(null);
 let next = 0;
 /** What native was last told, so closing an already-lowered chrome is free. */
 let sent: string | null = null;
@@ -19,7 +22,12 @@ export const raisedPanel = () => open;
 
 function send(raised: boolean, rect: DOMRect) {
   const key = raised
-    ? [Math.round(rect.x), Math.round(rect.y), Math.round(rect.width), Math.round(rect.height)].join()
+    ? [
+        Math.round(rect.x),
+        Math.round(rect.y),
+        Math.round(rect.width),
+        Math.round(rect.height),
+      ].join()
     : "down";
   if (key === sent) return;
   sent = key;
@@ -48,6 +56,34 @@ export function raiseFor(panel: HTMLElement): () => void {
     if (open?.id !== id) return;
     open = null;
     send(false, rect);
+  };
+}
+
+/**
+ * Keeps the chrome raised for `panel` while it is open: measured once it is
+ * laid out, and again as it settles from its opening motion (a rect taken
+ * mid-motion is the smaller, scaled one) or changes size as its contents
+ * arrive. Returns the way to lower it and stop following. Callers check
+ * `horizontal()` first, as they do for `raiseFor`.
+ */
+export function followPanel(panel: HTMLElement): () => void {
+  let live = true;
+  let lower: (() => void) | null = null;
+  const raise = () => {
+    if (live) lower = raiseFor(panel);
+  };
+  void tick().then(raise);
+  const settled = (event: TransitionEvent) => {
+    if (event.target === panel) raise();
+  };
+  panel.addEventListener("transitionend", settled);
+  const resized = typeof ResizeObserver === "function" ? new ResizeObserver(raise) : null;
+  resized?.observe(panel);
+  return () => {
+    live = false;
+    panel.removeEventListener("transitionend", settled);
+    resized?.disconnect();
+    lower?.();
   };
 }
 

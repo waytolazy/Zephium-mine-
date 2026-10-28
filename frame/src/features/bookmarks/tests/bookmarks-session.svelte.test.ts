@@ -89,6 +89,23 @@ describe("bookmarks session", () => {
     expect(session.error).toBe("cycle");
   });
 
+  it("counts the writes that applied, for views that are not the one writing", async () => {
+    const { BookmarksSession, bookmarksWrites } = await import("../lib/bookmarks-session.svelte");
+    const session = new BookmarksSession("profile");
+    const before = bookmarksWrites();
+    native.call.mockResolvedValueOnce(listing(null, []));
+    await session.open(null);
+    expect(bookmarksWrites()).toBe(before);
+    native.call.mockResolvedValueOnce({ kind: "error", error: "full" });
+    await session.addFolder("Refused");
+    expect(bookmarksWrites()).toBe(before);
+    native.call
+      .mockResolvedValueOnce({ kind: "saved", id: "4" })
+      .mockResolvedValueOnce(listing(null, [view("4", "Folder")]));
+    await session.addFolder("Folder");
+    expect(bookmarksWrites()).toBe(before + 1);
+  });
+
   it("searches after a pause and returns to the folder when cleared", async () => {
     vi.useFakeTimers();
     const { BookmarksSession } = await import("../lib/bookmarks-session.svelte");

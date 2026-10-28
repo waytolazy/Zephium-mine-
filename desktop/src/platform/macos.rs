@@ -621,10 +621,22 @@ thread_local! {
     /// The windows whose sidebar is hidden. Their controls show only with
     /// the sidebar's card.
     static HIDDEN_SIDEBARS: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
+    /// The windows whose chrome is a bar across the top. Their controls stay
+    /// in the bar's leading end whether or not the sidebar is hidden.
+    static TOP_BARS: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
+}
+
+fn has_top_bar(window: &WebviewWindow) -> bool {
+    TOP_BARS.with(|windows| windows.borrow().contains(window.label()))
+}
+
+fn sidebar_is_hidden(window: &WebviewWindow) -> bool {
+    HIDDEN_SIDEBARS.with(|windows| windows.borrow().contains(window.label()))
 }
 
 /// The sidebar is hidden or back: its left edge is watched while it is away,
-/// and the window controls go with it.
+/// where its card slides in from, and the window controls go with it unless
+/// a top bar holds them.
 pub fn sidebar_hidden(window: &WebviewWindow, hidden: bool) {
     let owner = window.clone();
     let _ = window.run_on_main_thread(move || {
@@ -637,17 +649,41 @@ pub fn sidebar_hidden(window: &WebviewWindow, hidden: bool) {
             }
         });
         sidebar_edge::watch(&owner, hidden);
-        super::window_controls::set_in_card(&owner, false);
-        super::window_controls::set_tucked(&owner, hidden);
+        if !has_top_bar(&owner) {
+            super::window_controls::set_in_card(&owner, false);
+            super::window_controls::set_tucked(&owner, hidden);
+        }
+    });
+}
+
+/// The chrome is a bar across the top, or the column beside the page again.
+/// The bar keeps the window controls in its leading end, so a hidden sidebar
+/// gives them back to it; a column hidden again under no bar takes them.
+pub fn chrome_top_bar(window: &WebviewWindow, on: bool) {
+    let owner = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        let changed = TOP_BARS.with(|windows| {
+            let mut windows = windows.borrow_mut();
+            if on {
+                windows.insert(owner.label().to_owned())
+            } else {
+                windows.remove(owner.label())
+            }
+        });
+        if changed && sidebar_is_hidden(&owner) {
+            super::window_controls::set_in_card(&owner, false);
+            super::window_controls::set_tucked(&owner, !on);
+        }
     });
 }
 
 /// The hidden sidebar's card shows its window controls, or has begun to
-/// leave and takes them at once. A sidebar in view keeps its own.
+/// leave and takes them at once. A sidebar in view keeps its own, and a top
+/// bar keeps them where they are.
 pub fn sidebar_card_lights(window: &WebviewWindow, shown: bool) {
     let owner = window.clone();
     let _ = window.run_on_main_thread(move || {
-        if HIDDEN_SIDEBARS.with(|windows| windows.borrow().contains(owner.label())) {
+        if sidebar_is_hidden(&owner) && !has_top_bar(&owner) {
             super::window_controls::set_tucked(&owner, !shown);
             if shown {
                 super::window_controls::set_in_card(&owner, true);

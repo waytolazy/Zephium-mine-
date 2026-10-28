@@ -348,6 +348,7 @@ pub(crate) struct FakeEngine {
     fills_window_for_fullscreen: std::sync::atomic::AtomicBool,
     fullscreen_exits: Mutex<Vec<ItemId>>,
     layout_regions: Mutex<Vec<Option<Rect>>>,
+    raised: Mutex<Vec<(bool, Rect, RaisedShape)>>,
     data_calls: Mutex<Vec<(Partition, zephium_core::browsing_data::EngineDataCall)>>,
     data_reply: Mutex<Option<zephium_core::browsing_data::EngineDataReply>>,
     download_calls: Mutex<Vec<(Partition, zephium_core::downloads::DownloadCall)>>,
@@ -791,9 +792,11 @@ impl Engine for FakeEngine {
         &self,
         window: WindowId,
         raised: bool,
-        _card: Rect,
+        rect: Rect,
+        shape: RaisedShape,
         _slide: bool,
     ) -> NativeDispatch {
+        self.raised.lock().unwrap().push((raised, rect, shape));
         self.log(format!("raise@{window} {raised}"));
         self.native_admission()
     }

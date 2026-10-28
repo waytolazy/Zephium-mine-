@@ -19,6 +19,7 @@
   import IconButton from "$shared/ui/IconButton";
   import CaptureControl from "$shared/ui/CaptureControl";
   import { preferences } from "$domain/preferences";
+  import { followPanel } from "$session/chrome-raise.svelte";
   import * as find from "../lib/find.svelte";
   import { flushSync, untrack, type Snippet } from "svelte";
   import { duration, easing, reducedMotion } from "$shared/lib/motion";
@@ -31,15 +32,23 @@
 
   let {
     compact = false,
+    variant = "sidebar",
     trailing,
   }: {
     compact?: boolean;
+    /** The column's field, centred at rest with what it offers under it, or
+     *  the pill in the bar across the window's top, which reads from its start
+     *  and hangs anything it offers over the page. */
+    variant?: "sidebar" | "bar";
     /** Controls that act on the page, at the far end of the field. Told which
      *  page it is, or null where there is no site to describe. */
     trailing?: Snippet<[SitePage | null]>;
   } = $props();
 
   let input: HTMLInputElement;
+  let bar = $derived(variant === "bar");
+  // What the column's field offers under itself; the bar has no room below.
+  let offers = $derived(!compact && !bar);
   let findInput: HTMLInputElement | undefined = $state();
   let finding = $derived(find.isOpen());
   let findCount = $derived.by(() => {
@@ -243,6 +252,37 @@
   });
 
   let pageRequest = $derived(tabs.activeTab()?.page_request ?? null);
+  let requestKey = $derived(
+    pageRequest === null ? null : `${tabs.activeId()}:${JSON.stringify(pageRequest)}`,
+  );
+  // Hung from the bar, the card is over the page with the chrome raised for
+  // it, and a raised chrome takes every press the page would have had. Any
+  // press elsewhere folds it to a mark on the pill, which brings it back; a
+  // new request opens again.
+  let requestOpen = $state(true);
+  $effect(() => {
+    void requestKey;
+    requestOpen = true;
+  });
+  function hang(card: HTMLElement) {
+    const lower = followPanel(card);
+    const fold = () => (requestOpen = false);
+    const outside = (event: PointerEvent) => {
+      if (!(event.target instanceof Node) || !card.contains(event.target)) fold();
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.isComposing) fold();
+    };
+    window.addEventListener("pointerdown", outside, true);
+    window.addEventListener("blur", fold);
+    card.addEventListener("keydown", escape);
+    return () => {
+      window.removeEventListener("pointerdown", outside, true);
+      window.removeEventListener("blur", fold);
+      card.removeEventListener("keydown", escape);
+      lower();
+    };
+  }
 
   // What appears only on demand is fetched the first time it is wanted, not
   // at startup; a failed fetch is tried again at the next request.
@@ -264,7 +304,14 @@
   compact mode it is present and correct but unpainted, and the launcher is the
   visible way to reach it.
 -->
-<form bind:this={form} class="shrink-0" class:pb-2={!compact} onsubmit={submit} role="search">
+<form
+  bind:this={form}
+  class="shrink-0"
+  class:pb-2={offers}
+  data-variant={variant}
+  onsubmit={submit}
+  role="search"
+>
   <!--
     A refused navigation rings the field, following the shared Field
     convention. The message is announced rather than drawn: a block of text
@@ -273,6 +320,7 @@
   <div
     class:sr-only={compact}
     class:flex={!compact}
+    data-variant={variant}
     bind:clientWidth={fieldWidth}
     style:--address-width={fieldWidth ? `${fieldWidth}px` : undefined}
     class:shadow-[inset_0_0_0_1px_var(--color-danger)]={failed}
@@ -329,9 +377,9 @@
         aria-describedby={failed ? "address-error" : undefined}
         onfocus={beginEditing}
         onblur={endEditing}
-        style:text-align={editing ? "start" : "center"}
-        style:direction={editing ? null : "rtl"}
-        style:padding-left={editing ? "0" : "var(--address-centering)"}
+        style:text-align={editing || bar ? "start" : "center"}
+        style:direction={editing || bar ? null : "rtl"}
+        style:padding-left={editing || bar ? "0" : "var(--address-centering)"}
         class="min-w-0 flex-1 bg-transparent text-[13.5px] text-ellipsis text-label-secondary outline-none placeholder:text-faint focus:text-text"
       />
       {#if finding}
@@ -387,10 +435,17 @@
         onclick={() => find.hide()}
       />
     {:else if !compact}
+      {#if bar && pageRequest && !requestOpen}<IconButton
+          icon={Alert02Icon}
+          label={m.page_request_waiting()}
+          size={14}
+          buttonSize={24}
+          onclick={() => (requestOpen = true)}
+        />{/if}
       {#if trailing}{@render trailing(sitePage)}{/if}
     {/if}
   </div>
-  {#if !compact && listedInstalled}
+  {#if offers && listedInstalled}
     {#if removing}
       <div
         class="store-remove"
@@ -418,7 +473,7 @@
         onclick={() => (removing = true)}>{m.webext_store_remove()}</Button
       >
     {/if}
-  {:else if !compact && listedId !== null}
+  {:else if offers && listedId !== null}
     <Button
       variant="primary"
       size="compact"
@@ -447,13 +502,43 @@
       <Icon icon={Alert02Icon} size={14} />
     </p>
   {:else if pageRequest && RequestCard}
-    {#key `${tabs.activeId()}:${JSON.stringify(pageRequest)}`}
-      <RequestCard tab={tabs.activeId()!} request={pageRequest} />
+    {#key requestKey}
+      {#if bar}
+        {#if requestOpen}<div class="request-hang" {@attach hang}>
+            <RequestCard tab={tabs.activeId()!} request={pageRequest} />
+          </div>{/if}
+      {:else}
+        <RequestCard tab={tabs.activeId()!} request={pageRequest} />
+      {/if}
     {/key}
   {/if}
 </form>
 
 <style>
+  /* The bar's pill: a fixed share of the row, reading from its start. */
+  form[data-variant="bar"] {
+    position: relative;
+  }
+
+  .address-field[data-variant="bar"] {
+    inline-size: clamp(200px, 26vw, 360px);
+    block-size: 30px;
+    border-radius: var(--radius-capsule);
+    padding-inline-start: 12px;
+  }
+
+  .request-hang {
+    position: absolute;
+    inset-block-start: calc(100% + 6px);
+    inset-inline-start: 0;
+    z-index: 40;
+    inline-size: max(100%, 320px);
+    padding: 10px;
+    border-radius: var(--radius-menu);
+    background: var(--color-float);
+    box-shadow: var(--shadow-popover);
+  }
+
   .store-remove {
     display: flex;
     align-items: center;

@@ -21,6 +21,8 @@
   "ui_enter_an_address": "Enter an address",
   "ui_address_and_search": "Address and search",
   "ui_browser_sidebar": "Browser sidebar",
+  "ui_top_bar": "Toolbar",
+  "ui_split_group": "Split group",
   "mode_browse": "Browse",
   "page_request_app_title": "Open {app}?",
   "page_request_app_missing": "No app on this computer opens “{scheme}:” links.",

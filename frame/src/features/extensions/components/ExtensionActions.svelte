@@ -4,6 +4,13 @@
   import * as m from "$shared/i18n/messages";
   import ExtensionActionIcon from "./ExtensionActionIcon.svelte";
 
+  let {
+    bar = false,
+  }: {
+    /** In the bar across the window's top: one row of buttons, as wide as they are. */
+    bar?: boolean;
+  } = $props();
+
   let profileId = $derived(tabs.profile()?.id ?? null);
   let tabId = $derived(tabs.activeId());
   let actions = $derived(extensions.activeActions(profileId, tabId));
@@ -51,6 +58,7 @@
 <div
   bind:this={actionRoot}
   class="actions"
+  class:actions-bar={bar}
   role="group"
   aria-label={m.webext_page_title()}
   data-zephium-extension-actions
@@ -89,6 +97,11 @@
     justify-content: flex-end;
     gap: 2px;
     min-inline-size: 0;
+  }
+
+  .actions-bar {
+    flex: none;
+    flex-wrap: nowrap;
   }
 
   .actions:empty {

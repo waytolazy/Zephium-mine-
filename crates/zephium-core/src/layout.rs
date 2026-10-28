@@ -1,13 +1,18 @@
 //! Pure window layout in top-left logical coordinates. Chrome and content tile
 //! without overlap, so the two webviews never contend for the cursor, except
 //! while the sidebar is hidden: then the page takes the window and the chrome
-//! keeps the column's width beneath it, ready to come over it.
+//! keeps the column's width beneath it, ready to come over it. Under a top bar
+//! the chrome is the whole window beneath the page in every shape.
 
 use crate::geometry::{Rect, Size};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
+    /// The column beside the page.
     Sidebar,
+    /// A bar across the window's top, with the column beneath the page as a
+    /// hidden sidebar's card, or beside it while it is held there.
+    TopBar,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -19,6 +24,9 @@ pub struct Metrics {
     pub caption: f64,
     /// The column is put away until the pointer asks for it.
     pub sidebar_hidden: bool,
+    /// The bar's height from the window's top to its foot, bookmarks row
+    /// included; only read in `Mode::TopBar`. The frame measures and reports it.
+    pub top_bar_height: f64,
 }
 
 impl Default for Metrics {
@@ -29,6 +37,7 @@ impl Default for Metrics {
             gap: 8.0,
             caption: 0.0,
             sidebar_hidden: false,
+            top_bar_height: 0.0,
         }
     }
 }
@@ -48,6 +57,44 @@ pub fn clamp_sidebar_width(width: f64) -> f64 {
         return MIN_SIDEBAR_WIDTH;
     }
     width.clamp(MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH)
+}
+
+/// The top bar's admitted height, bookmarks row included. As for the
+/// sidebar's width, this is the single authority: the privileged IPC guard
+/// rejects what lies outside it and the shell clamps to it.
+pub const MIN_TOP_BAR_HEIGHT: f64 = 0.0;
+pub const MAX_TOP_BAR_HEIGHT: f64 = 160.0;
+
+pub fn clamp_top_bar_height(height: f64) -> f64 {
+    if !height.is_finite() {
+        return MIN_TOP_BAR_HEIGHT;
+    }
+    height.clamp(MIN_TOP_BAR_HEIGHT, MAX_TOP_BAR_HEIGHT)
+}
+
+/// The part of `rect` inside the window: where a panel of the top bar hangs
+/// over the page, so the chrome is never raised past the window's edge.
+/// Empty when none of it is inside or it is not a number.
+pub fn clamp_to_window(window: Size, rect: Rect) -> Rect {
+    if ![
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height,
+        window.width,
+        window.height,
+    ]
+    .iter()
+    .all(|value| value.is_finite())
+    {
+        return Rect::default();
+    }
+    let (width, height) = (window.width.max(0.0), window.height.max(0.0));
+    let x = rect.x.clamp(0.0, width);
+    let y = rect.y.clamp(0.0, height);
+    let right = (rect.x + rect.width).clamp(x, width);
+    let bottom = (rect.y + rect.height).clamp(y, height);
+    Rect::new(x, y, right - x, bottom - y)
 }
 
 /// The Work browser pane never shrinks below a usable page; the frame around
@@ -106,20 +153,29 @@ pub fn hidden_card_edge(chrome_width: f64) -> f64 {
 }
 
 /// Where a hidden sidebar's card stands while it is over the page: the column
-/// with the inset all round it, as the frame draws it.
-pub fn hidden_card(window: Size, m: Metrics) -> Rect {
+/// with the inset all round it, as the frame draws it. Under a top bar it
+/// slides in beneath the bar, never over it.
+pub fn hidden_card(window: Size, mode: Mode, m: Metrics) -> Rect {
     let inset = HIDDEN_CARD_INSET;
+    let (top, height) = match mode {
+        Mode::Sidebar => (inset, window.height - 2.0 * inset),
+        Mode::TopBar => {
+            let top = m.top_bar_height + inset;
+            (top, window.height - top - inset)
+        }
+    };
     Rect::new(
         inset,
-        inset,
+        top,
         (m.sidebar_width + 2.0 * inset).min((window.width - inset).max(0.0)),
-        (window.height - 2.0 * inset).max(0.0),
+        height.max(0.0),
     )
 }
 
 pub fn compute(window: Size, mode: Mode, m: Metrics, content_present: bool) -> Layout {
     match mode {
         Mode::Sidebar => sidebar(window, m, content_present),
+        Mode::TopBar => top_bar(window, m, content_present),
     }
 }
 
@@ -163,6 +219,31 @@ fn sidebar(win: Size, m: Metrics, content_present: bool) -> Layout {
     }
 }
 
+/// The chrome is the whole window in every shape, so a hidden column's card
+/// and a bar's panel can come over the page without a layout. The bar starts
+/// at the window's very top, the window controls in it, so the page meets it
+/// across the gap alone and keeps its side and bottom gutters.
+fn top_bar(win: Size, m: Metrics, content_present: bool) -> Layout {
+    let chrome = Rect::new(0.0, 0.0, win.width, win.height);
+    if !content_present {
+        return Layout {
+            chrome,
+            content: None,
+        };
+    }
+    let p = m.padding;
+    let x = if m.sidebar_hidden {
+        p
+    } else {
+        p + m.sidebar_width + m.gap
+    };
+    let y = m.caption + m.top_bar_height + m.gap;
+    Layout {
+        chrome,
+        content: Some(Rect::new(x, y, win.width - x - p, win.height - y - p)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,6 +264,7 @@ mod tests {
         gap: 8.0,
         caption: 0.0,
         sidebar_hidden: false,
+        top_bar_height: 0.0,
     };
 
     #[test]
@@ -205,11 +287,11 @@ mod tests {
     #[test]
     fn the_hidden_card_is_the_column_with_its_inset_and_stays_in_the_window() {
         assert_eq!(
-            hidden_card(Size::new(1200.0, 800.0), M),
+            hidden_card(Size::new(1200.0, 800.0), Mode::Sidebar, M),
             Rect::new(8.0, 8.0, 256.0, 784.0)
         );
         assert_eq!(
-            hidden_card(Size::new(200.0, 100.0), M),
+            hidden_card(Size::new(200.0, 100.0), Mode::Sidebar, M),
             Rect::new(8.0, 8.0, 192.0, 84.0)
         );
         // The chrome beneath a hidden 240 column is 8 + 240 + reach wide.
@@ -223,9 +305,9 @@ mod tests {
             true,
         )
         .chrome;
-        let card = hidden_card(Size::new(1200.0, 800.0), M);
+        let card = hidden_card(Size::new(1200.0, 800.0), Mode::Sidebar, M);
         assert_eq!(hidden_card_edge(chrome.width), card.x + card.width);
-        let tiny = hidden_card(Size::new(4.0, 4.0), M);
+        let tiny = hidden_card(Size::new(4.0, 4.0), Mode::Sidebar, M);
         assert_eq!((tiny.width, tiny.height), (0.0, 0.0));
     }
 
@@ -304,5 +386,105 @@ mod tests {
         let content = l.content.unwrap();
         assert!(content.width >= 0.0 && content.height >= 0.0);
         assert!(l.chrome.height >= 0.0);
+    }
+
+    const BAR: Metrics = Metrics {
+        top_bar_height: 40.0,
+        ..M
+    };
+
+    #[test]
+    fn the_top_bar_height_clamp_admits_its_range_and_rejects_nonsense() {
+        assert_eq!(clamp_top_bar_height(MIN_TOP_BAR_HEIGHT), 0.0);
+        assert_eq!(clamp_top_bar_height(MAX_TOP_BAR_HEIGHT), 160.0);
+        assert_eq!(clamp_top_bar_height(40.0), 40.0);
+        assert_eq!(clamp_top_bar_height(-5.0), 0.0);
+        assert_eq!(clamp_top_bar_height(10_000.0), 160.0);
+        assert_eq!(clamp_top_bar_height(f64::NAN), 0.0);
+        assert_eq!(clamp_top_bar_height(f64::INFINITY), 0.0);
+    }
+
+    #[test]
+    fn under_a_top_bar_the_chrome_is_the_window_and_the_page_meets_the_bar() {
+        let window = Size::new(1200.0, 800.0);
+        let l = compute(window, Mode::TopBar, BAR, true);
+        assert_eq!(l.chrome, Rect::new(0.0, 0.0, 1200.0, 800.0));
+        // Beside the column, below the bar and its gap, gutters kept.
+        assert_eq!(l.content, Some(Rect::new(256.0, 48.0, 936.0, 744.0)));
+        let without = compute(window, Mode::TopBar, BAR, false);
+        assert_eq!(without.chrome, Rect::new(0.0, 0.0, 1200.0, 800.0));
+        assert!(without.content.is_none());
+    }
+
+    #[test]
+    fn a_hidden_column_under_a_top_bar_gives_the_page_the_width() {
+        let m = Metrics {
+            sidebar_hidden: true,
+            ..BAR
+        };
+        let l = compute(Size::new(1200.0, 800.0), Mode::TopBar, m, true);
+        assert_eq!(l.chrome, Rect::new(0.0, 0.0, 1200.0, 800.0));
+        assert_eq!(l.content, Some(Rect::new(8.0, 48.0, 1184.0, 744.0)));
+    }
+
+    #[test]
+    fn a_title_band_lowers_the_page_under_a_top_bar_too() {
+        let m = Metrics {
+            caption: 32.0,
+            ..BAR
+        };
+        let l = compute(Size::new(1200.0, 800.0), Mode::TopBar, m, true);
+        assert_eq!(l.content, Some(Rect::new(256.0, 80.0, 936.0, 712.0)));
+    }
+
+    #[test]
+    fn a_degenerate_window_under_a_top_bar_clamps_to_nonnegative() {
+        for window in [Size::new(10.0, 10.0), Size::new(0.0, 0.0)] {
+            let l = compute(window, Mode::TopBar, BAR, true);
+            let content = l.content.unwrap();
+            assert!(content.x >= 0.0 && content.y >= 0.0);
+            assert_eq!((content.width, content.height), (0.0, 0.0));
+            assert_eq!(l.chrome, Rect::new(0.0, 0.0, window.width, window.height));
+        }
+    }
+
+    #[test]
+    fn under_a_top_bar_the_card_slides_in_beneath_the_bar() {
+        assert_eq!(
+            hidden_card(Size::new(1200.0, 800.0), Mode::TopBar, BAR),
+            Rect::new(8.0, 48.0, 256.0, 744.0)
+        );
+        // With no bar measured yet it is the column's own card.
+        assert_eq!(
+            hidden_card(Size::new(1200.0, 800.0), Mode::TopBar, M),
+            hidden_card(Size::new(1200.0, 800.0), Mode::Sidebar, M)
+        );
+        let tiny = hidden_card(Size::new(4.0, 40.0), Mode::TopBar, BAR);
+        assert_eq!((tiny.width, tiny.height), (0.0, 0.0));
+    }
+
+    #[test]
+    fn a_raised_panel_is_kept_inside_the_window() {
+        let window = Size::new(1200.0, 800.0);
+        let panel = Rect::new(300.0, 40.0, 360.0, 420.0);
+        assert_eq!(clamp_to_window(window, panel), panel);
+        assert_eq!(
+            clamp_to_window(window, Rect::new(1000.0, 700.0, 360.0, 420.0)),
+            Rect::new(1000.0, 700.0, 200.0, 100.0)
+        );
+        assert_eq!(
+            clamp_to_window(window, Rect::new(-20.0, -10.0, 100.0, 50.0)),
+            Rect::new(0.0, 0.0, 80.0, 40.0)
+        );
+        let outside = clamp_to_window(window, Rect::new(1300.0, 900.0, 100.0, 100.0));
+        assert_eq!((outside.width, outside.height), (0.0, 0.0));
+        assert_eq!(
+            clamp_to_window(window, Rect::new(f64::NAN, 40.0, 360.0, 420.0)),
+            Rect::default()
+        );
+        assert_eq!(
+            clamp_to_window(Size::new(f64::INFINITY, 800.0), panel),
+            Rect::default()
+        );
     }
 }

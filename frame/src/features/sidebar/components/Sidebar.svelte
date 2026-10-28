@@ -6,6 +6,8 @@
   import { surface as browserPage } from "$domain/surface";
   import { tabs } from "$domain/tabs";
   import * as tools from "$session/tools.svelte";
+  import { horizontal } from "$session/chrome-layout.svelte";
+  import { raisedPanel } from "$session/chrome-raise.svelte";
   import { tick, untrack } from "svelte";
   import {
     COMPACT_WIDTH,
@@ -289,9 +291,37 @@
       Math.max(LINGER_MS, settling),
     );
   }
+  // Native keeps one raised state for the card and the bar's panels alike,
+  // so while a panel of the bar hangs over the page the card stays in, and a
+  // panel opening sends a card that is out away without a word to native:
+  // lowering it would lower the panel too. The window's edge runs up past the
+  // bar's leading end as well, where the pointer is reaching for the bar.
+  let inBar = false;
+  $effect(() => {
+    if (raisedPanel() === null) return;
+    untrack(() => {
+      clearTimeout(linger);
+      clearTimeout(lowered);
+      lowered = undefined;
+      peeking = false;
+    });
+  });
+  $effect(() => {
+    const follow = (event: PointerEvent) => {
+      inBar = event.target instanceof Element && !!event.target.closest("[data-top-bar]");
+    };
+    const gone = () => (inBar = false);
+    window.addEventListener("pointermove", follow, { passive: true });
+    document.documentElement.addEventListener("mouseleave", gone);
+    return () => {
+      window.removeEventListener("pointermove", follow);
+      document.documentElement.removeEventListener("mouseleave", gone);
+    };
+  });
   $effect(() => {
     const edge = (event: Event) => {
       if (!(event instanceof CustomEvent) || typeof event.detail?.near !== "boolean") return;
+      if (event.detail.near && (inBar || raisedPanel() !== null)) return;
       atEdge = event.detail.near;
       if (!away) return;
       if (atEdge) peek();
@@ -448,6 +478,7 @@
   data-peek={(away && peeking) || undefined}
   data-armed={(away && armed) || undefined}
   data-cut={CUT_TO_CARD || undefined}
+  data-bar={horizontal() || undefined}
   data-leaving={leaving ? true : undefined}
   style:left={leaving ? `${leaving.left}px` : undefined}
   style:top={leaving ? `${leaving.top}px` : undefined}
@@ -470,7 +501,7 @@
   onpointerenter={() => {
     pointerIn = true;
     // Back on the card as it leaves, it comes back.
-    if (away && !peeking && lowered !== undefined) peek();
+    if (away && !peeking && lowered !== undefined && raisedPanel() === null) peek();
     else if (away) clearTimeout(linger);
   }}
   onpointerleave={() => {
@@ -491,6 +522,7 @@
       launcher={paneled}
       ontoggle={toggleShape}
       pageControls={!inWork}
+      bar={horizontal()}
     />{/if}
   <div
     bind:this={columns}
@@ -550,6 +582,17 @@
     background: var(--sidebar-frost) center / cover;
     box-shadow: var(--shadow-overlay);
     translate: calc(-100% - 24px) 0;
+  }
+
+  /* With the tabs across the top the column has no head of its own: it
+     starts a gap below the bar, as the page does, and as a card it slides
+     in under the bar, never over it. */
+  .browser-sidebar[data-bar] {
+    padding-block-start: 8px;
+  }
+
+  .browser-sidebar[data-hidden][data-bar] {
+    inset-block-start: calc(var(--topbar-height, 0px) + 8px);
   }
 
   .browser-sidebar[data-custom-background][data-hidden] {

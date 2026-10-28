@@ -117,7 +117,8 @@ use zephium_core::ports::chrome::ChromeFrame;
 use zephium_core::ports::engine::Engine;
 use zephium_core::ports::engine::{
     ContentScope, DiscardProbeId, EngineEvent, NativeAction, NativeDispatch,
-    NavigationPresentationId, Partition, ProfileDataErasureOutcome, StageMotion, ZoomRequestId,
+    NavigationPresentationId, Partition, ProfileDataErasureOutcome, RaisedShape, StageMotion,
+    ZoomRequestId,
 };
 #[cfg(test)]
 use zephium_core::ports::store::Store;
@@ -276,6 +277,8 @@ pub struct Shell {
     browser_return_ready: bool,
     /// Set while the window lays out for a return that a queued command is about to change.
     browser_return_hidden: bool,
+    /// The window whose chrome a panel of its top bar holds over the page.
+    chrome_panel_raised: Option<WindowId>,
     browser_return: Option<browser_pages::PendingBrowserReturn>,
     work_pane: Option<work_pane::WorkPane>,
     work_pane_generation: u32,
@@ -515,6 +518,7 @@ impl Shell {
             browser_after_return: None,
             browser_return_ready: false,
             browser_return_hidden: false,
+            chrome_panel_raised: None,
             browser_return: None,
             work_pane: None,
             work_pane_generation: 0,
@@ -976,10 +980,67 @@ impl Shell {
                 if let Some(win) = self.windows.focused() {
                     // Only a hidden sidebar is beneath the page to come over it.
                     if !peek || win.metrics.sidebar_hidden {
-                        let card = layout::hidden_card(win.size, win.metrics);
-                        let _ = self.engine.raise_chrome(win.id, peek, card, slide);
+                        let card = layout::hidden_card(win.size, win.mode, win.metrics);
+                        let shape = RaisedShape::Card;
+                        let _ = self.engine.raise_chrome(win.id, peek, card, shape, slide);
                     }
                 }
+            }
+            Command::SetChromeLayout { top_bar } => {
+                let Some(win) = self.windows.focused_mut() else {
+                    return;
+                };
+                let mode = if top_bar.is_some() {
+                    layout::Mode::TopBar
+                } else {
+                    layout::Mode::Sidebar
+                };
+                let height = top_bar.map(layout::clamp_top_bar_height);
+                let reshaped = win.mode != mode;
+                if !reshaped && height.is_none_or(|h| h == win.metrics.top_bar_height) {
+                    return;
+                }
+                let left_top_bar = reshaped && win.mode == layout::Mode::TopBar;
+                win.mode = mode;
+                if let Some(height) = height {
+                    win.metrics.top_bar_height = height;
+                }
+                let id = win.id;
+                // A panel of the bar has nothing to hang from once it goes.
+                if left_top_bar && self.chrome_panel_raised == Some(id) {
+                    self.chrome_panel_raised = None;
+                    let _ = self.engine.raise_chrome(
+                        id,
+                        false,
+                        Rect::default(),
+                        RaisedShape::Panel,
+                        false,
+                    );
+                }
+                // A new shape is a journey the page travels; a bar that grew
+                // or shrank only moves the page's top.
+                if reshaped {
+                    let _ = self.engine.hint_stage_motion(id, StageMotion::Slide);
+                }
+                let _ = self.relayout_with(reshaped);
+            }
+            Command::RaiseChrome { raised, rect } => {
+                let Some(win) = self.windows.focused() else {
+                    return;
+                };
+                // A column beside the page tiles with it: nothing hangs over it.
+                if win.mode != layout::Mode::TopBar {
+                    return;
+                }
+                let rect = layout::clamp_to_window(win.size, rect);
+                // A panel with nothing of it inside the window shows nothing
+                // over the page, so it lowers the chrome instead.
+                let raised = raised && rect.width > 0.0 && rect.height > 0.0;
+                let id = win.id;
+                self.chrome_panel_raised = raised.then_some(id);
+                let _ = self
+                    .engine
+                    .raise_chrome(id, raised, rect, RaisedShape::Panel, false);
             }
             Command::SetPagePermissionCardHost(available) => {
                 self.set_page_permission_card_host(available)
@@ -990,7 +1051,17 @@ impl Shell {
                         let padding = win.metrics.padding;
                         let x = (padding + zephium_core::layout::clamp_sidebar_width(width) - 2.0)
                             .min((win.size.width - padding - 2.0).max(padding));
-                        Rect::new(x, padding, 2.0, (win.size.height - 2.0 * padding).max(0.0))
+                        let (top, height) = match win.mode {
+                            layout::Mode::Sidebar => (padding, win.size.height - 2.0 * padding),
+                            // Under a top bar the column stands below it, as
+                            // the page does, and so does the guide.
+                            layout::Mode::TopBar => {
+                                let m = win.metrics;
+                                let top = m.caption + m.top_bar_height + m.gap;
+                                (top, win.size.height - top - padding)
+                            }
+                        };
+                        Rect::new(x, top, 2.0, height.max(0.0))
                     });
                     let _ = self.engine.set_resize_guide(win.id, zone);
                 }

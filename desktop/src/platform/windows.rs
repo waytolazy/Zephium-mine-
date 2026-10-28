@@ -638,6 +638,26 @@ thread_local! {
     /// the sidebar's card ends, not where the chrome behind the page does.
     static HIDDEN_SIDEBARS: std::cell::RefCell<std::collections::HashSet<String>> =
         std::cell::RefCell::new(std::collections::HashSet::new());
+    /// The windows whose chrome is a bar across the top. The bar owns the
+    /// window's top edge, so the caption is only the corner's own buttons.
+    static TOP_BARS: std::cell::RefCell<std::collections::HashSet<String>> =
+        std::cell::RefCell::new(std::collections::HashSet::new());
+}
+
+/// The chrome is a bar across the top, or the column beside the page again.
+/// Read on the UI thread, where the caption is laid out.
+pub fn chrome_top_bar(window: &WebviewWindow, on: bool) {
+    let owner = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        TOP_BARS.with(|windows| {
+            let mut windows = windows.borrow_mut();
+            if on {
+                windows.insert(owner.label().to_owned());
+            } else {
+                windows.remove(owner.label());
+            }
+        });
+    });
 }
 
 /// The sidebar is hidden or back: the pointer is read for its left edge
@@ -681,7 +701,12 @@ impl Chrome for ChromeAdapter {
         };
         let page_left = (!frame.fill_width).then_some(frame.rect.x + edge);
         self.window
-            .run_on_main_thread(move || caption::set_page_left(&window, page_left))
+            .run_on_main_thread(move || {
+                // A top bar fills the window, so no page meets the window's
+                // top: the caption keeps to the corner, as over a new tab.
+                let top_bar = TOP_BARS.with(|windows| windows.borrow().contains(window.label()));
+                caption::set_page_left(&window, page_left.filter(|_| !top_bar));
+            })
             .is_ok()
     }
 }

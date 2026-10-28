@@ -494,6 +494,18 @@ pub enum Command {
     },
     /// Transient Windows resize feedback only; no width or layout mutation.
     SidebarResizeGuide(Option<f64>),
+    /// The chrome's shape: a bar of this height across the window's top with the
+    /// column beneath the page, or `None` for the column beside the page alone.
+    SetChromeLayout {
+        top_bar: Option<f64>,
+    },
+    /// Brings the chrome over the page within `rect` while a panel of the bar
+    /// hangs there, or puts it back beneath. Only meaningful in `Mode::TopBar`;
+    /// a `Sidebar` chrome tiles with the page and ignores it.
+    RaiseChrome {
+        raised: bool,
+        rect: Rect,
+    },
     /// Whether the expanded sidebar is on screen to show a page-permission
     /// prompt under its address field.
     SetPagePermissionCardHost(bool),

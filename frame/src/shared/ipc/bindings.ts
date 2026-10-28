@@ -548,7 +548,7 @@ export const commands = {
 	 *  Brings the chrome over the page within a rect while a panel of the top
 	 *  bar hangs there, or puts it back beneath the page.
 	 */
-	chromeRaise: (raised: boolean, x: number, y: number, width: number, height: number) => __TAURI_INVOKE<void>("chrome_raise", { raised, x, y, width, height }),
+	chromeRaise: (raised: boolean, x: number | null, y: number | null, width: number | null, height: number | null) => __TAURI_INVOKE<void>("chrome_raise", { raised, x, y, width, height }),
 	tabDragOver: (x: number | null, y: number | null) => __TAURI_INVOKE<void>("tab_drag_over", { x, y }),
 	resourceCall: (expectedProfile: string, call: ResourceCall_Deserialize) => __TAURI_INVOKE<ResourceReply_Serialize>("resource_call", { expectedProfile, call }),
 	noteCall: (expectedProfile: string, call: NoteCall) => __TAURI_INVOKE<NoteReply>("note_call", { expectedProfile, call }),

@@ -141,7 +141,7 @@
     min-width: 56px;
     max-width: 220px;
     height: 30px;
-    border-radius: min(var(--radius-row), 8px);
+    border-radius: var(--radius-tab);
     color: var(--color-label-secondary);
     font-size: var(--sidebar-row-text);
     font-weight: var(--sidebar-row-weight);
@@ -265,9 +265,9 @@
     color: var(--color-text);
   }
 
-  .strip-tab:is(:hover, [data-selected="true"]) .strip-close,
   :global([data-close-buttons="always"]) .strip-close,
-  .strip-close:focus-visible {
+  .strip-close:focus-visible,
+  .strip-tab:is(:hover, [data-selected="true"]) .strip-close {
     opacity: 1;
   }
 

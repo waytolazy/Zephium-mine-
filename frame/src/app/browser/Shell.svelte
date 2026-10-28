@@ -17,6 +17,7 @@
   import { loadClearSiteData, loadSettings } from "$features/settings";
   import { EssentialTile } from "$features/essentials";
   import { AddressField, SiteDetails, SiteHead, findInPage } from "$features/address";
+  import type { SitePage } from "$features/address";
   import { SidebarPagePermission } from "$features/permissions";
   import { Dock } from "$features/dock";
   import { DownloadPulse, DownloadStatus } from "$features/downloads";
@@ -32,9 +33,12 @@
   import { TabRail } from "$features/tabs";
   import { loadNavigationError, loadTabCapacityState } from "$features/tabs";
   import { selectionGlide } from "$features/tabs";
+  import { RailSpaces, SpaceBar } from "$features/tabs";
   import * as tabDrag from "$session/tab-drag.svelte";
   import { requestTab } from "$session/work-tab.svelte";
   import { expanded as sidebarWidth } from "$session/sidebar-mode.svelte";
+  import { horizontal, topBarHeight } from "$session/chrome-layout.svelte";
+  import TopBar from "./TopBar.svelte";
   import { uiCommands as ui } from "$domain/ui-commands";
   import { untrack, type Component, type Snippet } from "svelte";
   import { clearRequest } from "$domain/site-data";
@@ -97,7 +101,11 @@
   // The sidebar's own menu stands where the engine would offer Reload.
   onMount(() =>
     installChromeMenu((event) => {
-      if (!(event.target instanceof Element) || !event.target.closest(".browser-sidebar")) return;
+      if (
+        !(event.target instanceof Element) ||
+        !event.target.closest(".browser-sidebar, [data-top-bar]")
+      )
+        return;
       const active = tabs.activeTab();
       const page =
         browserPage.currentPage() === null &&
@@ -142,6 +150,10 @@
     toolHost.activeTool() !== null || browserPage.currentPage() === "settings",
   );
   let incognito = $derived(tabs.profile()?.kind === "incognito");
+  // The tabs across a bar at the window's top: the bar is then the only
+  // list of tabs and the only address, and the column keeps the rest.
+  let bar = $derived(horizontal());
+  let space = $derived(incognito ? undefined : tabs.activeSpace());
   // The column's body settles in only when the environment changes, never on launch.
   let modeSwitched = $state(false);
   let shownMode: boolean | null = null;
@@ -324,6 +336,28 @@
   }
 </script>
 
+<!-- Everything about the page in front, on whichever field names it. -->
+{#snippet addressTray(page: SitePage | null)}
+  <UtilityTray
+    {bar}
+    label={page === null
+      ? m.utilities()
+      : page.warning
+        ? m.site_info_label_status({ status: page.warning })
+        : m.site_info_label()}
+    warning={page?.warning}
+  >
+    {#snippet children(open)}
+      {#snippet siteHead(name: string | null, control?: Snippet)}
+        <SiteHead {page} label={name}>{@render control?.()}</SiteHead>
+      {/snippet}
+      <BlockerShield {open} head={page ? siteHead : undefined} />
+      <ExtensionsSection />
+      <SiteDetails {page} {open} />
+    {/snippet}
+  </UtilityTray>
+{/snippet}
+
 <!-- The player of a tab playing behind the page in front; its code loads the
      first time there is one. -->
 {#snippet player(
@@ -337,6 +371,8 @@
 <div
   class="shell flex h-screen w-screen p-2"
   data-tauri-drag-region
+  data-layout={bar ? "horizontal" : "vertical"}
+  style:--topbar-height={bar ? `${topBarHeight()}px` : undefined}
   class:pb-0={inWork}
   data-caption={IS_WINDOWS || undefined}
   data-zephium-active-tab={tabs.activeId() ?? ""}
@@ -344,75 +380,113 @@
   data-private={incognito || undefined}
 >
   {#if !newTabImage()}<SkyLight shown={skyShown} />{/if}
+  {#if bar}<TopBar
+      favorites={tree.favorites}
+      pinned={tree.pinned}
+      today={tree.today}
+      {splitting}
+      onSelect={selectTab}
+      tray={addressTray}
+    />{/if}
   <Sidebar
     >{#snippet browserBody(compact)}
-      {#if compact && (inWork || paneled)}
-        {#if !inWork}<AddressField {compact} /><StoreInstallRail />{/if}
-        {#if paneled && IS_WINDOWS}
+      {#if bar}
+        <!-- The bar holds the tabs and the address; the column keeps the
+             environment, the spaces and what the column says at its foot. -->
+        {#if compact && paneled && IS_WINDOWS}
           {#if browserPage.currentPage() === "settings"}<ModeTabs compact standalone />{/if}
           <div class="rail-search"><SidebarSearch /></div>
-        {:else if paneled}<ModeTabs compact standalone />{/if}
-      {:else if compact}<AddressField {compact} /><StoreInstallRail />
-      {:else if !incognito && preferences.enabled("work")}<div class="sidebar-head">
-          <ModeTabs />
-        </div>{/if}
-      <!-- One column in both environments: only what it lists changes, and the
+        {:else if compact && paneled}<ModeTabs compact standalone />
+        {:else if !compact && !incognito && preferences.enabled("work")}<div class="sidebar-head">
+            <ModeTabs />
+          </div>{/if}
+        {#key inWork}<div class="sidebar-mode-body" data-arriving={modeSwitched}>
+            {#if compact}
+              {#if space}<div class="bar-rail-spaces"><RailSpaces active={space} /></div>{/if}
+            {:else}
+              {#if space}<SpaceBar />{/if}
+              <HidingBar />
+              {#if splitting}<p
+                  class="shrink-0 px-3 pb-1 text-[12px] text-accent"
+                  aria-live="polite"
+                >
+                  {m.choose_split()}
+                </p>{/if}
+              <div class="column-room" aria-hidden="true"></div>
+              <SidebarNotice />
+              {#if tabs.profile()?.id}<DownloadStatus
+                  profile={tabs.profile()!.id}
+                  onopen={() => toolHost.open("downloads")}
+                />{/if}
+              <UpdateNotice view="cards" />
+              <PrivateReturn />
+              {@render player(false)}
+            {/if}
+          </div>{/key}
+      {:else}
+        {#if compact && (inWork || paneled)}
+          {#if !inWork}<AddressField {compact} /><StoreInstallRail />{/if}
+          {#if paneled && IS_WINDOWS}
+            {#if browserPage.currentPage() === "settings"}<ModeTabs compact standalone />{/if}
+            <div class="rail-search"><SidebarSearch /></div>
+          {:else if paneled}<ModeTabs compact standalone />{/if}
+        {:else if compact}<AddressField {compact} /><StoreInstallRail />
+        {:else if !incognito && preferences.enabled("work")}<div class="sidebar-head">
+            <ModeTabs />
+          </div>{/if}
+        <!-- One column in both environments: only what it lists changes, and the
            new list settles in where the old one was. -->
-      {#key inWork}<div class="sidebar-mode-body" data-arriving={modeSwitched}>
-          {#if compact}
-            <TabRail entries={railTabs} closable={railClosable} onSelect={selectTab} />
-          {:else}
-            <!--
+        {#key inWork}<div class="sidebar-mode-body" data-arriving={modeSwitched}>
+            {#if compact}
+              <TabRail entries={railTabs} closable={railClosable} onSelect={selectTab} />
+            {:else}
+              <!--
             The switch sits above the address field because it governs the
             whole column, field included; the tray rides the field itself,
             because everything in it acts on the page the field names.
           -->
-            <AddressField {compact}>
-              {#snippet trailing(page)}
-                <UtilityTray
-                  label={page === null
-                    ? m.utilities()
-                    : page.warning
-                      ? m.site_info_label_status({ status: page.warning })
-                      : m.site_info_label()}
-                  warning={page?.warning}
-                >
-                  {#snippet children(open)}
-                    {#snippet siteHead(name: string | null, control?: Snippet)}
-                      <SiteHead {page} label={name}>{@render control?.()}</SiteHead>
-                    {/snippet}
-                    <BlockerShield {open} head={page ? siteHead : undefined} />
-                    <ExtensionsSection />
-                    <SiteDetails {page} {open} />
-                  {/snippet}
-                </UtilityTray>
-              {/snippet}
-            </AddressField>
-            <!-- Work floats its page over the whole window, sidebar included. -->
-            {#if !inWork}<SidebarPagePermission />{/if}
+              <AddressField {compact} trailing={addressTray} />
+              <!-- Work floats its page over the whole window, sidebar included. -->
+              {#if !inWork}<SidebarPagePermission />{/if}
 
-            <HidingBar />
-            {#if splitting}<p class="shrink-0 px-3 pb-1 text-[12px] text-accent" aria-live="polite">
-                {m.choose_split()}
-              </p>{/if}
-            <SidebarBody pinned={tree.pinned} today={tree.today} {splitting} onSelect={selectTab} />
-            <!-- Brief notices and downloads sit at the foot of the column, by the dock. -->
-            <SidebarNotice />
-            {#if tabs.profile()?.id}<DownloadStatus
-                profile={tabs.profile()!.id}
-                onopen={() => toolHost.open("downloads")}
-              />{/if}
-            <UpdateNotice view="cards" />
-            <PrivateReturn />
-            {@render player(false)}
-          {/if}
-        </div>{/key}
+              <HidingBar />
+              {#if splitting}<p
+                  class="shrink-0 px-3 pb-1 text-[12px] text-accent"
+                  aria-live="polite"
+                >
+                  {m.choose_split()}
+                </p>{/if}
+              <SidebarBody
+                pinned={tree.pinned}
+                today={tree.today}
+                {splitting}
+                onSelect={selectTab}
+              />
+              <!-- Brief notices and downloads sit at the foot of the column, by the dock. -->
+              <SidebarNotice />
+              {#if tabs.profile()?.id}<DownloadStatus
+                  profile={tabs.profile()!.id}
+                  onopen={() => toolHost.open("downloads")}
+                />{/if}
+              <UpdateNotice view="cards" />
+              <PrivateReturn />
+              {@render player(false)}
+            {/if}
+          </div>{/key}
+      {/if}
     {/snippet}{#snippet dock(
       compact,
     )}{#snippet accountFoot()}{#await loadAccountButton() then { default: AccountButton }}<AccountButton
             name={tabs.profile()?.name ?? ""}
           />{/await}{/snippet}{#if compact && incognito}{@render player(true)}<PrivateBar
           compact
+        />{:else if compact && bar}{@render player(true)}<PrivateReturn compact /><UpdateNotice
+          view="glyph"
+          onabout={openAbout}
+        /><Dock
+          compact
+          tools={!inWork}
+          foot={inWork ? accountFoot : undefined}
         />{:else if compact}{@render player(true)}{#if tabs.profile()?.id && !inWork}<DownloadPulse
             profile={tabs.profile()?.id ?? ""}
           />{/if}<PrivateReturn compact /><UpdateNotice view="glyph" onabout={openAbout} /><Dock
@@ -427,7 +501,7 @@
         </Dock>{:else if incognito}
         <!-- A private window keeps nothing, so it has no tools or kept sites;
              its foot names the scope and closes it. -->
-        <PrivateBar />{:else}<Dock>
+        <PrivateBar />{:else if bar}<Dock />{:else}<Dock>
           {#snippet above()}
             <div
               class="dock-sites"
@@ -665,6 +739,39 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
+  }
+
+  /* The bar across the top is the first row and starts at the window's very
+     top; the column and the page share the row under it, a gap below it. */
+  .shell[data-layout="horizontal"] {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
+    padding-block-start: 0;
+  }
+
+  .shell[data-layout="horizontal"] > :global(.browser-sidebar) {
+    grid-row: 2;
+    grid-column: 1;
+  }
+
+  .shell[data-layout="horizontal"] > .stage-column {
+    grid-row: 2;
+    grid-column: 2;
+    padding-block-start: 8px;
+  }
+
+  .column-room {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .bar-rail-spaces {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    padding-block: 0 2px;
   }
 
   .stage-column > :global(main) {

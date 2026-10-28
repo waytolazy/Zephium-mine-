@@ -26,6 +26,7 @@
   import * as m from "$shared/i18n/messages";
   import { BookmarksSession } from "../lib/bookmarks-session.svelte";
   import * as compose from "../lib/compose.svelte";
+  import * as menuTarget from "../lib/menu-target";
   import * as reveal from "../lib/reveal.svelte";
 
   let { profile, query }: { profile: string; query: string } = $props();
@@ -40,8 +41,7 @@
   let address = $state("");
   let name = $state("");
   let addProblem = $state<"invalid" | "failed" | null>(null);
-  /** The row a native menu was opened on; the menu is modal, so one at a time. */
-  let menuTarget: BookmarkView | null = null;
+  const menuOwner = Symbol("bookmarks panel");
   /** A link just deleted, kept long enough to put it back. */
   let deleted = $state<{
     item: { title: string; url: string; parent: string | null };
@@ -225,15 +225,14 @@
   function openMenu(event: MouseEvent, item: BookmarkView) {
     event.preventDefault();
     if (renaming !== null) return;
-    menuTarget = item;
+    menuTarget.arm(menuOwner, item);
     void commands.bookmarkMenuPopup(event.clientX, event.clientY, item.url === null).catch(() => {
-      menuTarget = null;
+      menuTarget.disarm(menuOwner);
     });
   }
 
   function runMenu(action: string) {
-    const item = menuTarget;
-    menuTarget = null;
+    const item = menuTarget.claim(menuOwner);
     if (!item) return;
     switch (action) {
       case "open":

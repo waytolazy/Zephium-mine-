@@ -7,6 +7,8 @@
   import { PagePermissionPrompt } from "$features/permissions";
   import { updateNotices } from "$features/updates";
   import * as sidebar from "$session/sidebar-mode.svelte";
+  import * as chrome from "$session/chrome-layout.svelte";
+  import { lowerAll } from "$session/chrome-raise.svelte";
   import { Dividers } from "$features/split";
   import { commands } from "$shared/ipc/bindings";
   import { IS_MAC } from "$shared/platform";
@@ -43,6 +45,20 @@
     const mode = preferences.value("sidebar.mode");
     if (mode === "default" || mode === "compact" || mode === "hidden")
       untrack(() => sidebar.adoptMode(mode));
+  });
+
+  // The chrome's shape follows its preference the same way, untracked: it
+  // reads the layout it sets. Leaving the bar puts back anything it raised
+  // before native is told the bar is gone.
+  $effect(() => {
+    const layout = preferences.value("ui.tab-layout");
+    if (layout !== "vertical" && layout !== "horizontal") return;
+    untrack(() => {
+      if (layout === chrome.chromeLayout()) return;
+      if (layout === "vertical") lowerAll();
+      chrome.adoptLayout(layout);
+      sidebar.followLayout();
+    });
   });
 
   $effect(() => {

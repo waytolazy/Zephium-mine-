@@ -361,15 +361,24 @@ impl EngineHost {
     }
 
     #[cfg(any(target_os = "macos", target_os = "windows"))]
-    pub(crate) fn raise_chrome(&mut self, window: WindowId, raised: bool, card: Rect, slide: bool) {
+    pub(crate) fn raise_chrome(
+        &mut self,
+        window: WindowId,
+        raised: bool,
+        rect: Rect,
+        shape: zephium_core::ports::engine::RaisedShape,
+        slide: bool,
+    ) {
         if let Some(stage) = self.stages.get(&window) {
+            // AppKit only restacks the views: nothing is cut, and the page
+            // shows through whatever of the chrome's document is clear.
             #[cfg(target_os = "macos")]
             {
-                let _ = (card, slide);
+                let _ = (rect, shape, slide);
                 stage.raise_chrome(raised);
             }
             #[cfg(target_os = "windows")]
-            stage.raise_chrome(raised, card, slide);
+            stage.raise_chrome(raised, rect, shape, slide);
         }
     }
 
