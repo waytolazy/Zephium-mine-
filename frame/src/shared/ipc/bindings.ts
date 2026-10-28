@@ -539,6 +539,16 @@ export const commands = {
 	sidebarPeek: (peek: boolean, lights: boolean, slide: boolean) => __TAURI_INVOKE<void>("sidebar_peek", { peek, lights, slide }),
 	sidebarResize: (width: number | null, enabled: boolean, revision: number | null) => __TAURI_INVOKE<boolean>("sidebar_resize", { width, enabled, revision }),
 	sidebarResizeGuide: (width: number | null) => __TAURI_INVOKE<boolean>("sidebar_resize_guide", { width }),
+	/**
+	 *  The chrome's shape: a top bar of this height over the page, with the
+	 *  sidebar beneath it, or `null` for the sidebar beside the page alone.
+	 */
+	chromeSetLayout: (topBar: number | null) => __TAURI_INVOKE<void>("chrome_set_layout", { topBar }),
+	/**
+	 *  Brings the chrome over the page within a rect while a panel of the top
+	 *  bar hangs there, or puts it back beneath the page.
+	 */
+	chromeRaise: (raised: boolean, x: number, y: number, width: number, height: number) => __TAURI_INVOKE<void>("chrome_raise", { raised, x, y, width, height }),
 	tabDragOver: (x: number | null, y: number | null) => __TAURI_INVOKE<void>("tab_drag_over", { x, y }),
 	resourceCall: (expectedProfile: string, call: ResourceCall_Deserialize) => __TAURI_INVOKE<ResourceReply_Serialize>("resource_call", { expectedProfile, call }),
 	noteCall: (expectedProfile: string, call: NoteCall) => __TAURI_INVOKE<NoteReply>("note_call", { expectedProfile, call }),
