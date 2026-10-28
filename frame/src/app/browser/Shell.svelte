@@ -71,7 +71,7 @@
     SidebarNotice,
     UtilityTray,
   } from "$features/sidebar";
-  import { IS_WINDOWS } from "$shared/platform";
+  import { IS_MAC, IS_WINDOWS } from "$shared/platform";
   import { installChromeMenu } from "$shared/lib/chrome-menu";
   import { tabs } from "$domain/tabs";
   import { preferences } from "$domain/preferences";
@@ -377,6 +377,7 @@
   style:--topbar-height={bar ? `${topBarHeight()}px` : undefined}
   class:pb-0={inWork}
   data-caption={IS_WINDOWS || undefined}
+  data-page-edge={IS_MAC || undefined}
   data-zephium-active-tab={tabs.activeId() ?? ""}
   data-zephium-surface={browserPage.currentPage() ?? "browse"}
   data-private={incognito || undefined}
@@ -761,6 +762,15 @@
     grid-row: 2;
     grid-column: 2;
     padding-block-start: var(--window-gutter);
+  }
+
+  /* macOS edges every page view with a hairline of its own, and flush it
+     lies where the page meets the bar and the column. While a live page is
+     in front the chrome draws no rule there, so one line shows, not two; a
+     page the frame draws (any main here) has no edge but the chrome's. */
+  .shell[data-page-edge]:not(:has(> .stage-column > :global(main))) {
+    --top-bar-rule: none;
+    --column-rule: 0px;
   }
 
   .column-room {

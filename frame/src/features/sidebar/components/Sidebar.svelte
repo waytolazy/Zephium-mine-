@@ -566,10 +566,11 @@
   }
 
   /* Flush against the window and the page, the column keeps the gutter's
-     room inside its own edge; --chrome-inset is nothing while the window
-     keeps a gutter of its own. */
+     room inside its own edge and ends in a rule where the page meets it;
+     both are nothing while the window keeps a gutter of its own. */
   .browser-sidebar:not([data-hidden]) {
     padding: var(--chrome-inset);
+    border-inline-end: var(--column-rule) solid var(--color-border);
   }
 
   /* Hidden, the column is a card that waits beside the window and slides

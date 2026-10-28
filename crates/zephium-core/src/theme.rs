@@ -487,10 +487,16 @@ mod tests {
         // No hue to speak of in either mode: blue leads by a breath at most.
         for light in [false, true] {
             let [r, g, b] = chrome("mono", None, D, false, light);
-            assert!(r.abs_diff(g) <= 1 && b >= g && b - g <= 3, "{light}: {r} {g} {b}");
+            assert!(
+                r.abs_diff(g) <= 1 && b >= g && b - g <= 3,
+                "{light}: {r} {g} {b}"
+            );
         }
         // Its dark ground sits below graphite's, nearer black.
         let dark = chrome("mono", None, D, false, false);
-        assert!(dark[0] < chrome("zephium", None, D, false, false)[0], "{dark:?}");
+        assert!(
+            dark[0] < chrome("zephium", None, D, false, false)[0],
+            "{dark:?}"
+        );
     }
 }

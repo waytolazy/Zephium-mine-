@@ -18,16 +18,22 @@ afterEach(() => {
   native.flush.mockClear();
 });
 
-it("tells native the look only when it changes, and never the soft it starts in", () => {
+it("tells native the first look it adopts, then only a change", () => {
   adoptLook("soft");
-  expect(native.flush).not.toHaveBeenCalled();
+  adoptLook("soft");
+  expect(native.flush.mock.calls).toEqual([[false]]);
 
   adoptLook("flat");
+  adoptLook("flat");
+  expect(native.flush.mock.calls).toEqual([[false], [true]]);
+
+  adoptLook("soft");
+  expect(native.flush.mock.calls).toEqual([[false], [true], [false]]);
+});
+
+it("sends a flat look stored before the first adoption at once", () => {
   adoptLook("flat");
   expect(native.flush.mock.calls).toEqual([[true]]);
-
-  adoptLook("soft");
-  expect(native.flush.mock.calls).toEqual([[true], [false]]);
 });
 
 it("keeps the look apart from the shape", () => {

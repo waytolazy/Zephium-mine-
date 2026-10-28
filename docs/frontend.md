@@ -36,6 +36,11 @@ the required behavior. Popovers must remain inside their owning chrome WebView.
   for window glass. CSS blur is allowed when it improves the interface and its
   bounded rendering cost is justified; avoid gratuitous or animated blur. This
   supersedes older blanket blur prohibitions in design documents.
+- The look is an axis, not a conditional: `data-look="flat"` on the root
+  (`src/styles/axes/look.css`, from `ui.look`) folds the radii to a boxy scale,
+  turns every lift into a hairline, paints the window opaque in the chrome
+  colour whatever material is installed, and closes the gutters; native closes
+  its own through `chrome_set_flush` (see `design/top-bar.md`, section 4).
 - Colors and shadows come only through semantic tokens in
   `src/styles/tokens.css`, shared by both app roots. Never use raw palette utilities such as `white/10` in
   component markup. Every component must work in dark, light, reduced-motion,

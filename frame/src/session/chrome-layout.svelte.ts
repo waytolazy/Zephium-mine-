@@ -17,8 +17,9 @@ let layout = $state.raw<ChromeLayout>("vertical");
  *  foot, bookmarks row included. Zero until the bar has been measured. */
 let barHeight = $state.raw(0);
 let published: string | null = null;
-/** Native starts every window soft, so only a change is ever sent. */
-let look: ChromeLook = "soft";
+/** What native was last told. It starts every window soft and remembers
+ *  nothing across a reload, so the first look adopted is always sent. */
+let look: ChromeLook | null = null;
 
 export const chromeLayout = () => layout;
 export const horizontal = () => layout === "horizontal";
@@ -61,5 +62,5 @@ export function resetChromeLayout() {
   layout = "vertical";
   barHeight = 0;
   published = null;
-  look = "soft";
+  look = null;
 }

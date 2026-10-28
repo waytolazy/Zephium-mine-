@@ -19,8 +19,8 @@
      platform's own materials use one to keep colour alive behind frosted
      white, but this panel is graphite by design, and all a boost does here is
      pull whatever hue the wallpaper happens to have up into it. The flat
-     look's menus are solid and blur nothing. */
-  backdrop-filter: var(--menu-backdrop);
+     look's menus are solid and blur nothing (--menu-backdrop, look.css). */
+  backdrop-filter: var(--menu-backdrop, blur(24px));
   box-shadow: var(--shadow-menu), var(--shine-top);
   outline: none;
   overflow: hidden;

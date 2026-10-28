@@ -360,6 +360,10 @@
   --content-radius: 12px;
   --content-radius-windows: 8px; /* how Windows rounds a page, and so a card cut over it */
 
+  /* The foot of a Work pane a live page stands in, a pixel inside its card;
+     native rounds the page's foot to match, and squares it when flush. */
+  --page-well-radius: calc(var(--radius-card) - 1px);
+
   /* The window's gutter round the chrome and the page, native's padding and
      gap, and what the chrome keeps inside its own edge when the window keeps
      none. The flat look (axes/look.css) trades one for the other. */
@@ -387,11 +391,14 @@
   --shadow-field-focus: inset 0 0 0 1px var(--color-field-ring);
   --shadow-raise: inset 0 0 0 1px rgb(255 255 255 / 0.05), inset 0 1px 0 0 rgb(255 255 255 / 0.06);
 
-  /* The address field's edge, and the rule along the top bar's foot. On the
-     glass the field's fill is its edge and the page stands a gap below the
-     bar, so neither draws a line; the flat look draws both. */
+  /* The address field's edge, the rule along the top bar's foot and the
+     width of the one at the column's end. On the glass the field's fill is
+     its edge and the page stands a gap from the chrome, so none draws a
+     line; the flat look draws all three. */
   --address-edge: none;
   --top-bar-rule: none;
+  --column-rule: 0px;
+
   --shadow-track: inset 0 1px 2px rgb(0 0 0 / 0.22), inset 0 0 0 1px rgb(0 0 0 / 0.08);
 
   /* The thumb is the one moving part that genuinely sits above its track, and
@@ -442,9 +449,6 @@
 
   /* How much of the sky's light the window takes beside a new tab. */
   --sky-light: 1;
-
-  /* What a menu blurs of whatever is under its translucent ground. */
-  --menu-backdrop: blur(24px);
 
   /* The plain new tab's field: a plate a step above the page. */
   --color-page-field: var(--color-surface);

@@ -22,6 +22,7 @@
   --radius-pill: 5px;
   --content-radius: 0px;
   --content-radius-windows: 0px;
+  --page-well-radius: 0px;
 
   /* No gutter: the page meets the chrome and the window's edges, and the
      chrome keeps that room inside its own edge instead. */
@@ -45,6 +46,20 @@
 
   /* The plain new tab's field is the page itself, edged by its hairline. */
   --color-page-field: transparent;
+}
+
+/* Opaque whatever material native has installed: the window never shows its
+   glass, or the desktop through it, under the flat look. */
+:root[data-look="flat"],
+:root[data-look="flat"] :is(body, #root) {
+  background: var(--color-chrome);
+}
+
+@media (forced-colors: active) {
+  :root[data-look="flat"],
+  :root[data-look="flat"] :is(body, #root) {
+    background: Canvas;
+  }
 }
 
 /* Edges are hairlines and nothing else. "0 0 transparent" is nothing,
@@ -76,25 +91,24 @@
   --shine: 0 0 transparent;
   --shine-top: 0 0 transparent;
 
-  /* The field sits on a hairline and the bar on a rule. */
+  /* The field sits on a hairline; the bar and the column end in a rule,
+     each its own last pixel, where the page meets them. */
   --address-edge: inset 0 0 0 1px var(--color-border);
   --top-bar-rule: inset 0 -1px 0 0 var(--color-border);
+  --column-rule: 1px;
 }
 
 :root[data-look="flat"]:not([data-theme="light"]) {
   --color-float: var(--color-raised);
 }
 
-/* Opaque whatever material native has installed: the window never shows its
-   glass, or the desktop through it, under the flat look. */
-:root[data-look="flat"],
-:root[data-look="flat"] :is(body, #root) {
-  background: var(--color-chrome);
+/* With no rim, the current tab or row is told by its fill alone, so in the
+   chrome it stands a clear step above hover: a brighter plate in dark, the
+   page's own white in light, where menus keep their ink (global.css). */
+:root[data-look="flat"] :is(.browser-sidebar, [data-top-bar]) {
+  --row-active: var(--color-fill-active);
 }
 
-@media (forced-colors: active) {
-  :root[data-look="flat"],
-  :root[data-look="flat"] :is(body, #root) {
-    background: Canvas;
-  }
+:root[data-look="flat"][data-theme="light"] :is(.browser-sidebar, [data-top-bar]) {
+  --row-active: var(--color-surface);
 }

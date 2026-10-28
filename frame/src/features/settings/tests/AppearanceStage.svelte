@@ -15,6 +15,11 @@
       fontSize: preferences.value("ui.font-size"),
       codeFont: preferences.value("ui.code-font"),
     });
+    theme.applyLayout({
+      density: preferences.value("ui.density") === "compact" ? "compact" : "comfortable",
+      contrast: preferences.value("ui.contrast") === "true",
+      look: preferences.value("ui.look") === "flat" ? "flat" : "soft",
+    });
   });
 </script>
 

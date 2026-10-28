@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-svelte";
 import { flushSync } from "svelte";
 import "$styles/global.css";
@@ -16,14 +16,14 @@ import { favicons } from "$domain/favicons";
 import { surface } from "$domain/surface";
 import { tabs } from "$domain/tabs";
 import { preferences } from "$domain/preferences";
-import { theme } from "$domain/appearance";
+import { palette, theme } from "$domain/appearance";
 import { uiCommands } from "$domain/ui-commands";
 import * as sidebar from "$session/sidebar-mode.svelte";
 import * as chrome from "$session/chrome-layout.svelte";
 import { resetChromeRaise } from "$session/chrome-raise.svelte";
 import * as launch from "$session/motion.svelte";
 import Shell from "../Shell.svelte";
-import { raster, wallpaper } from "./look-bench";
+import { raster, themed, wallpaper } from "./look-bench";
 
 const native = vi.hoisted(() => ({
   settings: {} as Record<string, string>,
@@ -72,7 +72,9 @@ afterEach(() => {
   uiCommands.dispose();
   native.flush.mockClear();
   document.getElementById("wallpaper")?.remove();
+  document.getElementById("live-page")?.remove();
   theme.applyLayout({ density: "comfortable", contrast: false, look: "soft" });
+  themed("zephium");
   delete document.documentElement.dataset.material;
 });
 
@@ -102,6 +104,10 @@ const bookmark = (id: string, title: string, url: string | null): BookmarkView =
   children: url === null ? 2 : 0,
   parent: null,
 });
+const READING = [
+  bookmark("6", "The flat design manifesto", "https://essay.example/flat"),
+  bookmark("7", "Chromium UI guidelines", "https://chromium.example/ui"),
+];
 const BOOKMARKS = [
   bookmark("1", "Reading", null),
   bookmark("2", "Zephium", "https://zephium.app/"),
@@ -151,7 +157,7 @@ async function flat(
     active = "x",
   }: { layout?: "horizontal" | "vertical"; active?: string } = {},
 ) {
-  await page.viewport(1200, 720);
+  await page.viewport(1440, 900);
   native.settings = {
     appearance: mode,
     "ui.look": "flat",
@@ -162,7 +168,12 @@ async function flat(
   native.bookmarks.mockImplementation(
     async (_profile: string, call: BookmarkCall): Promise<BookmarkResponse> =>
       call.kind === "list"
-        ? { kind: "listing", folder: call.folder, path: [], items: call.folder ? [] : BOOKMARKS }
+        ? {
+            kind: "listing",
+            folder: call.folder,
+            path: [],
+            items: call.folder ? READING : BOOKMARKS,
+          }
         : { kind: "saved", id: null },
   );
   document.documentElement.dataset.theme = mode;
@@ -207,6 +218,38 @@ async function flat(
 
 const px = (value: string) => Number.parseFloat(value) || 0;
 const opaque = (color: string) => !/rgba?\([^)]*,\s*0(?:\.\d+)?\)|transparent/u.test(color);
+/** Each shadow in a computed list, colour aside: [x, y, blur, spread]. */
+const shadows = (value: string) =>
+  value === "none"
+    ? []
+    : value
+        .replace(/rgba?\([^)]*\)/gu, "")
+        .split(",")
+        .map((shadow) => (shadow.match(/-?[\d.]+px/gu) ?? []).map(px));
+/** Drawn at all: a shadow with a colour that is not wholly transparent. */
+const drawn = (value: string) =>
+  value !== "none" &&
+  value.split(/,(?![^(]*\))/u).some((shadow) => !/rgba\(0, 0, 0, 0\)/u.test(shadow));
+
+/** Native's page view stands over the chrome in the stage's rect; a sheet in
+ *  a site's colours stands in for it, under anything raised over the page. */
+function livePage(mode: "dark" | "light") {
+  const stage = document.querySelector(".stage-column")!.getBoundingClientRect();
+  const [ground, ink] = mode === "dark" ? ["#0f1115", "#262a31"] : ["#ffffff", "#ececef"];
+  const sheet = document.createElement("div");
+  sheet.id = "live-page";
+  sheet.style.cssText = `position:fixed;z-index:10;left:${stage.left}px;top:${stage.top}px;width:${stage.width}px;height:${stage.height}px;background:${ground};padding:28px 48px;box-sizing:border-box;display:grid;align-content:start;gap:14px`;
+  for (const width of [18, 62, 88, 80, 84, 46, 0, 72, 90, 64])
+    sheet.append(
+      Object.assign(document.createElement("i"), {
+        style: `display:block;height:${width === 18 ? 22 : 10}px;width:${width}%;background:${ink};border-radius:3px`,
+      }),
+    );
+  document.body.append(sheet);
+}
+
+/** The pointer rests on the page, away from the chrome. */
+const rest = () => userEvent.hover(page.elementLocator(document.getElementById("live-page")!));
 
 /** Every corner drawn in the bar's own rows, discs aside: an avatar, a badge. */
 function corners(root: Element): { element: Element; radius: number }[] {
@@ -232,6 +275,8 @@ for (const mode of ["dark", "light"] as const) {
   test(`the bar is flat, opaque and boxy, ${mode}`, async () => {
     const { screen, all } = await flat(mode);
     await expect.element(screen.getByRole("button", { name: "Rust docs" })).toBeVisible();
+    livePage(mode);
+    await rest();
     await settle();
     await shot(mode);
 
@@ -255,7 +300,19 @@ for (const mode of ["dark", "light"] as const) {
     // One opaque ground over the glass, nothing lit and nothing blurred.
     expect(opaque(getComputedStyle(document.body).backgroundColor)).toBe(true);
     expect(opaque(getComputedStyle(document.documentElement).backgroundColor)).toBe(true);
-    expect(getComputedStyle(document.querySelector(".sky-light")!).opacity).toBe("0");
+    const light = document.querySelector<HTMLElement>(".sky-light")!;
+    light.setAttribute("data-shown", "");
+    expect(getComputedStyle(light).opacity).toBe("0");
+    light.removeAttribute("data-shown");
+
+    // The column waits beneath the page as a bordered panel: no frost, no drop.
+    const card = document.querySelector<HTMLElement>(".browser-sidebar")!;
+    expect(card.hasAttribute("data-hidden")).toBe(true);
+    const ground = getComputedStyle(card);
+    expect(ground.backgroundImage).toBe("none");
+    expect(opaque(ground.backgroundColor)).toBe(true);
+    expect(drawn(ground.boxShadow)).toBe(false);
+    expect(drawn(getComputedStyle(card, "::after").boxShadow)).toBe(true);
 
     // Boxy: nothing in the bar's rows rounder than a row, discs aside.
     const round = corners(bar).filter(({ radius }) => radius > 6);
@@ -267,14 +324,28 @@ for (const mode of ["dark", "light"] as const) {
     expect(getComputedStyle(field).boxShadow).toMatch(/inset/u);
     const current = bar.querySelector<HTMLElement>('.strip-tab[data-selected="true"]')!;
     expect(getComputedStyle(current).borderTopLeftRadius).toBe("5px");
-    expect(getComputedStyle(current).boxShadow).toBe("none");
+    expect(drawn(getComputedStyle(current).boxShadow)).toBe(false);
 
-    // Hover, then a keyboard focus, each still reads on the flat ground.
-    await screen
-      .getByRole("button", { name: "Agentic Infrastructure - Vercel", exact: true })
-      .hover();
+    // Hover stays a step below the current tab's plate.
+    const vercel = screen.getByRole("button", {
+      name: "Agentic Infrastructure - Vercel",
+      exact: true,
+    });
+    await vercel.hover();
     await settle();
+    const hovered = vercel.element().closest<HTMLElement>(".strip-tab")!;
+    expect(getComputedStyle(hovered).backgroundColor).not.toBe(
+      getComputedStyle(current).backgroundColor,
+    );
     await shot(`${mode}-hover`);
+
+    // A keyboard focus rings the control it lands on.
+    await rest();
+    current.querySelector<HTMLElement>(".strip-open")!.focus();
+    await userEvent.keyboard("{Tab}");
+    expect(document.activeElement?.closest(".strip-tab")).toBe(current);
+    expect(getComputedStyle(document.activeElement!).outlineStyle).not.toBe("none");
+    await shot(`${mode}-focus`);
 
     // The profile's stack hangs from the bar, solid and edged by a hairline.
     bar.querySelector<HTMLElement>(".shelf .case")!.click();
@@ -284,9 +355,15 @@ for (const mode of ["dark", "light"] as const) {
     expect(opaque(panel.backgroundColor)).toBe(true);
     expect(panel.backdropFilter).toBe("none");
     expect(px(panel.borderTopLeftRadius)).toBeLessThanOrEqual(8);
-    expect(panel.boxShadow).not.toMatch(/\d+px \d+px \d+px/u);
+    expect(shadows(panel.boxShadow).every(([, , blur]) => !blur)).toBe(true);
     await shot(`${mode}-stack`);
     bar.querySelector<HTMLElement>(".shelf .case")!.click();
+
+    // Brought out over the page, as a pointer at the window's edge does.
+    card.style.translate = "0 0";
+    await settle();
+    await shot(`${mode}-card`);
+    card.style.translate = "";
 
     // A folder of the bookmarks row opens the same flat menu.
     await screen.getByRole("button", { name: "Reading" }).click();
@@ -301,6 +378,7 @@ for (const mode of ["dark", "light"] as const) {
       .not.toBeNull();
     const field = screen.container.querySelector<HTMLElement>(".plain-field")!;
     await expect.element(screen.getByRole("combobox")).toBeVisible();
+    await userEvent.hover(page.elementLocator(screen.container.querySelector(".plain")!));
     await settle();
     await shot(`${mode}-newtab`);
 
@@ -316,8 +394,33 @@ for (const mode of ["dark", "light"] as const) {
   });
 }
 
+// Mono is the flat look's plain black-grey, chosen by hand like any theme.
+for (const mode of ["dark", "light"] as const)
+  test(`mono is plain grey under the flat look, ${mode}`, async () => {
+    themed("mono");
+    await flat(mode);
+    await expect.element(page.getByRole("button", { name: "Rust docs" })).toBeVisible();
+    livePage(mode);
+    await rest();
+    await settle();
+    await shot(`mono-${mode}`);
+    // The window is the ground native paints for Mono, and it has no hue.
+    const context = document.createElement("canvas").getContext("2d")!;
+    context.fillStyle = getComputedStyle(document.body).backgroundColor;
+    context.fillRect(0, 0, 1, 1);
+    const painted = [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+    const ground = palette.preset("mono")!.ground[mode];
+    const native = [1, 3, 5].map((at) => parseInt(ground.slice(at, at + 2), 16));
+    painted.forEach((channel, at) =>
+      expect(Math.abs(channel - native[at]!)).toBeLessThanOrEqual(1),
+    );
+    expect(Math.max(...painted) - Math.min(...painted)).toBeLessThanOrEqual(3);
+  });
+
 test("the flat look is the same in the column beside the page", async () => {
   await flat("dark", { layout: "vertical" });
+  livePage("dark");
+  await rest();
   await settle();
   await shot("dark-vertical");
   const shell = document.querySelector<HTMLElement>(".shell")!;

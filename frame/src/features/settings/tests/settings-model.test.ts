@@ -82,6 +82,12 @@ it("finds the page zoom options", async () => {
   }
 });
 
+it("finds the look by its name and by what flat takes away", async () => {
+  const { searchSettings } = await import("../lib/settings-model");
+  for (const query of ["look", "flat", "square corners", "gutters"])
+    expect(searchSettings(query).some((result) => result.target === "appearance.look")).toBe(true);
+});
+
 it("takes each feature's pages out of navigation and search while its switch is off", async () => {
   const off = new Set<string>();
   vi.resetModules();

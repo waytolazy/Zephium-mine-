@@ -122,8 +122,10 @@ test("a row is a name, with the icons of its first tabs and a count of the rest,
     ],
   });
   await screen.getByRole("button", { name: "Spaces — Home" }).click();
-  const rows = [...screen.container.querySelectorAll<HTMLElement>("[data-space-row]")];
-  expect(rows).toHaveLength(3);
+  // The switcher's code arrives on first open, a moment after the click.
+  const listed = () => [...screen.container.querySelectorAll<HTMLElement>("[data-space-row]")];
+  await expect.poll(() => listed().length).toBe(3);
+  const rows = listed();
   expect(rows[1]!.querySelectorAll(".switch-fav")).toHaveLength(3);
   expect(rows[1]!.querySelector(".switch-more")?.textContent).toBe("+2");
   expect(rows[2]!.querySelector(".switch-stack")).toBeNull();

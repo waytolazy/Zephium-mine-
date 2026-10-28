@@ -107,7 +107,8 @@
   });
 
   // Flat is a native fact too: the page meets the chrome with no gutter and
-  // square corners. Told once per change, as the shape is.
+  // square corners. Native starts every window soft, so it is told the look
+  // as soon as there is one and again on every change.
   $effect(() => {
     const next = look;
     untrack(() => chrome.adoptLook(next));

@@ -403,7 +403,8 @@
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    border-radius: var(--radius-card);
+    border-radius: var(--radius-card) var(--radius-card) calc(var(--page-well-radius) + 1px)
+      calc(var(--page-well-radius) + 1px);
     background: var(--color-surface);
     box-shadow:
       0 0 0 1px var(--color-border-strong),
@@ -506,7 +507,7 @@
     flex: 1 1 auto;
     min-block-size: 0;
     margin: 0 1px 1px;
-    border-radius: 0 0 calc(var(--radius-card) - 1px) calc(var(--radius-card) - 1px);
+    border-radius: 0 0 var(--page-well-radius) var(--page-well-radius);
     background: var(--color-page);
     transition: background-color var(--motion-fast) var(--ease-smooth);
   }
