@@ -128,6 +128,7 @@
   .top-bar {
     display: flex;
     flex-direction: column;
+    grid-row: 1;
     grid-column: 1 / -1;
     min-width: 0;
     color: var(--color-text);

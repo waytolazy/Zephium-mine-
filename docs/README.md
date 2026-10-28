@@ -18,6 +18,7 @@ controls product intent.
 - [Interface system](design/system.md): tokens, shared components and how to inspect them.
 - [Settings](design/settings.md): settings structure, search and navigation.
 - [Launcher](design/launcher.md): the floating search window and what it hands off.
+- [Top bar](design/top-bar.md): the horizontal chrome, its native geometry and the card the column becomes.
 - [History](design/history.md): the history module, omnibox queries and site icons.
 - [Tasks](design/tasks-redesign.md): the shared Tasks surface for people and agents.
 - [Charts](design/charts.md): the chart kit used by Work results and Activity.

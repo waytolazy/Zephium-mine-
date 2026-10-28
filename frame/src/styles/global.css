@@ -245,8 +245,9 @@ kbd {
 
 /* A light sidebar reads in ink a step back from black, as the platform's own
    sidebars do, and everything lit in it is lifted rather than inked, so the
-   current tab, the field, the kept sites and the profile share one tone. */
-:root[data-theme="light"] .browser-sidebar {
+   current tab, the field, the kept sites and the profile share one tone.
+   The bar across the top is the same chrome on the same material. */
+:root[data-theme="light"] :is(.browser-sidebar, [data-top-bar]) {
   --color-text: rgb(28 28 31 / 0.9);
   --color-label-secondary: rgb(28 28 31 / 0.76);
   --color-fill: rgb(255 255 255 / 0.14);
@@ -262,7 +263,7 @@ kbd {
 
 /* Menus opening from the column float on their own white material, where a
    lift would vanish; they keep the ink states. */
-:root[data-theme="light"] .browser-sidebar .ui-disclosure-panel {
+:root[data-theme="light"] :is(.browser-sidebar, [data-top-bar]) .ui-disclosure-panel {
   --color-fill: var(--ink-a5);
   --row-hover: var(--row-hover-ink);
   --row-active: var(--row-active-ink);
@@ -281,7 +282,7 @@ kbd {
     --color-muted: color-mix(in srgb, var(--seed-fg) calc(52% + 20% * var(--seed-k)), transparent);
     --color-faint: color-mix(in srgb, var(--seed-fg) calc(31% + 24% * var(--seed-k)), transparent);
   }
-  :root[data-palette][data-theme="light"] .browser-sidebar {
+  :root[data-palette][data-theme="light"] :is(.browser-sidebar, [data-top-bar]) {
     --color-text: color-mix(in srgb, var(--seed-fg) 90%, transparent);
     --color-label-secondary: color-mix(in srgb, var(--seed-fg) 76%, transparent);
     --color-row-current: color-mix(in srgb, var(--seed-fg) 84%, transparent);

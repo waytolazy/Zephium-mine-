@@ -55,7 +55,12 @@ the required behavior. Popovers must remain inside their owning chrome WebView.
 2. **The chrome cannot draw over page content.** Its WebView ends at the
    configured rectangle. Menus, context menus, and page-overlapping surfaces
    are native. A DOM popover is allowed only when fully contained in the
-   sidebar; do not portal one across a WebView boundary.
+   sidebar; do not portal one across a WebView boundary. Under the top bar
+   (`ui.tab-layout = horizontal`) the chrome is the whole window beneath the
+   page, so a panel hanging from the bar asks native to raise the chrome over
+   the page for exactly its rect through `session/chrome-raise.svelte.ts`
+   (`raiseFor`) and lowers it on every close path; one panel or the hidden
+   column's card is raised at a time, never both.
 3. **`src/shared/ipc/bindings.ts` is generated** by `cargo test -p zephium-desktop
 export_typescript_bindings`. Never edit it by hand.
 4. **Favicons stay fixed raster.** `shared/ui/FavIcon` accepts only the bounded
@@ -98,7 +103,11 @@ security boundary, not a rendering optimization.
 - `data-zephium-new-tab` is conditional markup with no outro. Never leave a
   transitioning or hidden sentinel behind.
 - Do not virtualize away an active/presenting row or create drag/responsive
-  duplicates carrying any sentinel attribute.
+  duplicates carrying any sentinel attribute. Under the top bar the strip
+  (`features/tabs/components/TabStrip.svelte`, rows in `StripTab.svelte`) is
+  the only tab list: the column mounts no `SidebarBody`, `TabRail`,
+  `EssentialsRail` or kept-sites `TabList`, and the bar's `AddressField` is the
+  one `data-zephium-address` input.
 - Never move a barrier field through `$effect`, `tick`, a microtask, an
   animation frame, or an awaited callback.
 
@@ -145,6 +154,7 @@ security boundary, not a rendering optimization.
 ```text
 src/
   app/            composition roots, assembling independent features through snippets
+                  (Shell for the column, TopBar for the horizontal layout)
   features/       product slices: sidebar, tabs, essentials, address, spaces,
                   extensions, blocker, permissions, launcher, newtab, settings, tools, library, split, notes, tasks, work
   session/        shared transient state with one WebView-document lifetime

@@ -126,9 +126,13 @@ re-reading this section.
 one window fight over the cursor: NSTrackingArea fires regardless of z-occlusion
 (clicks hit-test with z; cursor tracking does not). Therefore:
 
-- **Tiling, never overlap.** Chrome = one region rectangle (sidebar or top bar),
-  content = another, gaps = window vibrancy. `core::layout` computes both rects
-  from (window size, mode, metrics).
+- **Tiling, never overlap.** Chrome = one region rectangle (the sidebar
+  column), content = another, gaps = window vibrancy. `core::layout` computes
+  both rects from (window size, mode, metrics). The two exceptions are
+  deliberate and bounded: a hidden sidebar and the top bar (`Mode::TopBar`)
+  keep the chrome beneath the page, and native raises it over the page only
+  for the card or one bar panel at a time, lowering it on the first press
+  outside (see `docs/design/top-bar.md`).
 - **Native content stage owns content geometry.** A custom NSView subclass
   (objc2 `define_class`) hosts content webviews as subviews and lays out the
   split tree inside AppKit's layout pass (`resizeSubviewsWithOldSize:`), so
@@ -385,7 +389,7 @@ favorites and folders into one aggregate; there is no separate bookmarks system.
   `{ view: u64, item: ItemId, profile }`. Many items, few views (§7).
 - **Window** - `{ id, kind: Main | App { origin } | Little, profile,
   active_space, mode, splits: Option<Pane> }`.
-- **Layout / Splits** - `Mode` (Sidebar now; Horizontal/top reserved) + the
+- **Layout / Splits** - `Mode` (`Sidebar`, or `TopBar` with the column as a card) + the
   split `Pane` tree (built, proven). Layout owns geometry; the engine
   positions native views to match.
 - **Session** - snapshot of windows/spaces/splits/active per profile for

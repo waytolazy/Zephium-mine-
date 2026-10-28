@@ -279,7 +279,9 @@
   });
   // Beside a new tab the window, whatever it is made of, takes on the
   // sky's light; it gives it back as a page arrives.
-  let skyShown = $derived(newTabShown && newTabImage() === null);
+  let skyShown = $derived(
+    newTabShown && newTabImage() === null && preferences.value("ui.newtab-background") !== "plain",
+  );
 
   $effect(() => {
     const tab = tabs.activeTab();

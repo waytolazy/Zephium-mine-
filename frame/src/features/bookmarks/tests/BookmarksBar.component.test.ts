@@ -32,7 +32,13 @@ const native = vi.hoisted(() => ({
   open: vi.fn(async (_url: string, _newTab: boolean) => ({ operation_id: null, accepted: true })),
   menu: vi.fn(async (_x: number | null, _y: number | null, _folder: boolean) => true),
   raise: vi.fn(
-    async (_raised: boolean, _x: number, _y: number, _width: number, _height: number) => {},
+    async (
+      _raised: boolean,
+      _x: number | null,
+      _y: number | null,
+      _width: number | null,
+      _height: number | null,
+    ) => {},
   ),
 }));
 vi.mock("$shared/ipc/bindings", async () => {

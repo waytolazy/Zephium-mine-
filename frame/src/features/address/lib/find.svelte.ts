@@ -6,6 +6,7 @@
 import { commands } from "$shared/ipc/bindings";
 import { events } from "$shared/ipc/native-events";
 import { expandBriefly } from "$session/sidebar-mode.svelte";
+import { horizontal } from "$session/chrome-layout.svelte";
 
 const TYPING_PAUSE_MS = 90;
 
@@ -57,7 +58,8 @@ export function show(tab: string | null) {
   page = tab;
   if (!open) {
     open = true;
-    restoreSidebar = expandBriefly();
+    // The bar's field is always in view; only the column's may need showing.
+    restoreSidebar = horizontal() ? null : expandBriefly();
   }
   focusRequest += 1;
 }
