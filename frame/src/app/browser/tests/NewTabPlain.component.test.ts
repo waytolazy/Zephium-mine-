@@ -94,7 +94,8 @@ test("the plain page is its own colour with the field and nothing else", async (
   ])
     expect(root.querySelector(gone), gone).toBeNull();
   await expect.element(screen.getByRole("img", { name: "Zephium" })).not.toBeInTheDocument();
-  await expect.element(screen.getByRole("button")).not.toBeInTheDocument();
+  // The one control it keeps: its own settings, in the top-end corner.
+  await expect.element(screen.getByRole("button")).toHaveAccessibleName("Customize New Tab");
   expect(root.querySelector("defs, linearGradient")).toBeNull();
 
   // The page's own ground, the window's sky never asked for.

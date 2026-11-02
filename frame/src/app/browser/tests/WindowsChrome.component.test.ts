@@ -35,8 +35,10 @@ test("acrylic retains its color wash through the transparent material reset", ()
   expect(getComputedStyle(document.body).backgroundColor).toMatch(/(?:0\.2\b|20%)/);
   root.setAttribute("data-material", "vibrancy");
   expect(getComputedStyle(document.body).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  // Solid: native paints the window, and the shell paints the ground round
+  // the page; the document itself stays clear where the page lives.
   root.setAttribute("data-material", "none");
-  expect(getComputedStyle(document.body).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(getComputedStyle(document.body).backgroundColor).toBe("rgba(0, 0, 0, 0)");
 });
 
 test("the Windows tool rail puts mode above search without reserving a page title band", async () => {

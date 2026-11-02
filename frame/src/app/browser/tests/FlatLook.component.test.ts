@@ -395,7 +395,8 @@ for (const mode of ["dark", "light"] as const) {
     expect(style.boxShadow).toMatch(/inset/u);
     expect(px(style.borderTopLeftRadius)).toBeLessThanOrEqual(8);
     const plain = screen.container.querySelector(".plain")!;
-    expect(plain.querySelectorAll("svg, img, canvas").length).toBeLessThanOrEqual(1);
+    // The field's search mark and the gear to the page's own settings.
+    expect(plain.querySelectorAll("svg, img, canvas").length).toBeLessThanOrEqual(2);
   });
 }
 
