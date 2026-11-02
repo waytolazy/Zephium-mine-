@@ -558,7 +558,10 @@
     --sky-edge-faint: var(--sky-night-edge-faint);
   }
 
-  :global(:root:not([data-material="none"])[data-material]) .newtab {
+  /* The window's material shows through the openings, except under the flat
+     look, which is opaque whatever is installed: the page then paints the
+     chrome's colour there itself rather than leaning on the document's. */
+  :global(:root:not([data-material="none"], [data-look="flat"])[data-material]) .newtab {
     background: transparent;
   }
 

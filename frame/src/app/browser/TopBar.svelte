@@ -43,8 +43,10 @@
 
   // In fullscreen the lights are gone, and so is the room kept for them.
   let lights = $derived(IS_MAC && !fullscreen());
-  // Work has no page in front: the field shows nothing and the page's
-  // controls rest, while the strip still opens a tab over the canvas.
+  // Work has no page in front: the page's controls rest and there is no
+  // field, while the strip still opens a tab over the canvas. A tab opened
+  // there brings its own address with it, the one the native barrier reads;
+  // a second, hidden one here would be the first it found.
   let inWork = $derived(browserPage.currentPage() === "work");
   let incognito = $derived(tabs.profile()?.kind === "incognito");
   let profile = $derived(tabs.profile()?.id ?? null);
@@ -97,10 +99,10 @@
       onclick={toggle}
     />
     <NavigationButtons disabled={inWork} />
-    <div class="bar-address">
-      <AddressField variant="bar" compact={inWork} trailing={tray} />
-    </div>
-    {#if !inWork}<StoreInstallRail />{/if}
+    {#if !inWork}<div class="bar-address">
+        <AddressField variant="bar" trailing={tray} />
+      </div>
+      <StoreInstallRail />{/if}
     <TabStrip {favorites} {pinned} {today} {splitting} {onSelect} />
     <IconButton icon={Add01Icon} label={m.new_tab()} onclick={tabs.open} />
     <span class="bar-end">
@@ -137,6 +139,12 @@
     color: var(--color-text);
     box-shadow: var(--top-bar-rule);
     user-select: none;
+  }
+
+  /* On a solid ground the bar is that ground, as the ring round the page
+     beneath it is (Shell.svelte); the page never lies under the bar. */
+  :global(:root:is([data-material="none"], [data-look="flat"])) .top-bar {
+    background: var(--color-chrome);
   }
 
   /* The row's controls centre where the column's head does, on the band

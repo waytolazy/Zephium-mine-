@@ -35,7 +35,10 @@
     if (command.id !== "space.new" && command.id !== "space.edit") return;
     untrack(() => {
       if (!requests.claim(command.seq)) return;
-      requests.ask(command.id === "space.new" ? "new" : "edit", isHidden() ? expandBriefly() : null);
+      requests.ask(
+        command.id === "space.new" ? "new" : "edit",
+        isHidden() ? expandBriefly() : null,
+      );
     });
   });
 

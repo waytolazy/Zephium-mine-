@@ -91,6 +91,11 @@ export class RowDrag {
 
   down(event: PointerEvent, id: string) {
     if (event.button !== 0) return;
+    // A new press: whatever click the last drag's release made has come by
+    // now, or never will (let go away from its row, the click lands on what
+    // the two have in common, not on the row), and this press's click is a
+    // click.
+    this.#swallow = false;
     this.#down = { x: event.clientX, y: event.clientY };
     this.#id = id;
     this.#dragging = false;

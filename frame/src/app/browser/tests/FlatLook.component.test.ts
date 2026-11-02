@@ -29,6 +29,7 @@ const native = vi.hoisted(() => ({
   settings: {} as Record<string, string>,
   flush: vi.fn(async (_flush: boolean) => {}),
   bookmarks: vi.fn(),
+  raise: vi.fn(async (..._args: unknown[]) => {}),
 }));
 
 vi.mock("$shared/ipc/bindings", async () => {
@@ -44,7 +45,7 @@ vi.mock("$shared/ipc/bindings", async () => {
     settingGet: async (key: string) => native.settings[key] ?? null,
     settingSet: async () => ({ accepted: true, operation_id: null }),
     chromeSetLayout: async () => {},
-    chromeRaise: async () => {},
+    chromeRaise: native.raise,
     chromeSetFlush: native.flush,
     bookmarkCall: native.bookmarks,
     newtabSearchContext: async () => ({
@@ -297,9 +298,13 @@ for (const mode of ["dark", "light"] as const) {
     expect(stage.left).toBe(0);
     expect(getComputedStyle(bar).boxShadow).toMatch(/inset/u);
 
-    // One opaque ground over the glass, nothing lit and nothing blurred.
-    expect(opaque(getComputedStyle(document.body).backgroundColor)).toBe(true);
-    expect(opaque(getComputedStyle(document.documentElement).backgroundColor)).toBe(true);
+    // One opaque ground over the glass, nothing lit and nothing blurred: drawn
+    // round the page, never on the document, which stays clear where the
+    // page lives (macOS raises the whole chrome view over it).
+    const ring = getComputedStyle(document.querySelector(".stage-column")!, "::before");
+    expect(drawn(ring.boxShadow)).toBe(true);
+    expect(opaque(ring.boxShadow)).toBe(true);
+    expect(opaque(getComputedStyle(bar).backgroundColor)).toBe(true);
     const light = document.querySelector<HTMLElement>(".sky-light")!;
     light.setAttribute("data-shown", "");
     expect(getComputedStyle(light).opacity).toBe("0");
@@ -406,7 +411,7 @@ for (const mode of ["dark", "light"] as const)
     await shot(`mono-${mode}`);
     // The window is the ground native paints for Mono, and it has no hue.
     const context = document.createElement("canvas").getContext("2d")!;
-    context.fillStyle = getComputedStyle(document.body).backgroundColor;
+    context.fillStyle = getComputedStyle(document.querySelector("[data-top-bar]")!).backgroundColor;
     context.fillRect(0, 0, 1, 1);
     const painted = [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
     const ground = palette.preset("mono")!.ground[mode];
@@ -429,4 +434,41 @@ test("the flat look is the same in the column beside the page", async () => {
   expect(getComputedStyle(column).paddingInlineStart).toBe("8px");
   const stage = document.querySelector<HTMLElement>(".stage-column")!.getBoundingClientRect();
   expect(stage.left).toBe(column.getBoundingClientRect().right);
+});
+
+test("raised over the page, the chrome covers only what it draws", async () => {
+  // macOS raises a panel of the bar by bringing the whole chrome view over
+  // the page, uncut: whatever the document paints where the page lies would
+  // hide it until the panel closed.
+  const raises = native.raise.mock.calls.length;
+  await flat("dark");
+  livePage("dark");
+  document.documentElement.dataset.material = "none";
+  await settle();
+  const bar = document.querySelector<HTMLElement>("[data-top-bar]")!;
+  bar.querySelector<HTMLElement>(".shelf .case")!.click();
+  await expect.poll(() => native.raise.mock.calls.slice(raises).at(-1)?.[0]).toBe(true);
+
+  const clear = (element: Element) =>
+    expect(getComputedStyle(element).backgroundColor, element.className || element.tagName).toBe(
+      "rgba(0, 0, 0, 0)",
+    );
+  for (const element of [
+    document.documentElement,
+    document.body,
+    document.getElementById("root") ?? document.body,
+    document.querySelector(".shell")!,
+    document.querySelector(".stage-column")!,
+  ])
+    clear(element);
+  const ring = getComputedStyle(document.querySelector(".stage-column")!, "::before");
+  expect(ring.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(opaque(ring.boxShadow)).toBe(true);
+  expect(opaque(getComputedStyle(bar).backgroundColor)).toBe(true);
+  // The page's rect is where the ring is open: the stage's, flush.
+  const stage = document.querySelector(".stage-column")!.getBoundingClientRect();
+  const before = document.querySelector(".stage-column")!;
+  expect(px(getComputedStyle(before, "::before").top)).toBe(0);
+  expect(stage.top).toBe(bar.offsetHeight);
+  bar.querySelector<HTMLElement>(".shelf .case")!.click();
 });

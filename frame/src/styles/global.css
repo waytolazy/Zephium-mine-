@@ -88,13 +88,20 @@ button {
   overflow: clip;
 }
 
-/* The window's own ground, the colour native paints behind the chrome, so the
-   gutter around a page the frame draws reads as window rather than page. The
-   column is not painted again on top: one ground, with only the page set
-   apart from it. The flat look is this ground whatever the material
-   (axes/look.css). */
-:root:is([data-material="none"], [data-look="flat"]) body {
-  background: var(--color-chrome);
+/* A solid ground (no material, or the flat look whatever the material) is
+   never painted on the document. To raise a panel of the top bar or the
+   hidden column's card, macOS brings the whole chrome view over the page,
+   and a painted document would cover the page with it. The ground is the
+   window's own colour on every part of the chrome but the page, drawn by
+   the shell round the page's rect (Shell.svelte): one ground, with only the
+   page set apart from it. Until native has said which material it has, the
+   bootstrap paint stands; forced colours keep the system's own canvas
+   (axes/look.css), since they draw no shadow to paint the ground with. */
+@media not (forced-colors: active) {
+  :root[data-material]:is([data-material="none"], [data-look="flat"]),
+  :root[data-material]:is([data-material="none"], [data-look="flat"]) :is(body, #root) {
+    background: transparent;
+  }
 }
 
 /* Windows rounds the window and draws its edge itself, in every tier; an edge

@@ -15,6 +15,8 @@ import { resetChromeRaise } from "$session/chrome-raise.svelte";
 import * as launch from "$session/motion.svelte";
 import Shell from "../Shell.svelte";
 
+vi.mock("../WorkWorkspace.svelte", async () => await import("./StageStub.svelte"));
+
 const native = vi.hoisted(() => ({
   layout: vi.fn(async (_height: number | null) => {}),
   raise: vi.fn(
@@ -28,6 +30,7 @@ const native = vi.hoisted(() => ({
   ),
   hidden: vi.fn(async (_hidden: boolean) => {}),
   host: vi.fn(async (_available: boolean) => {}),
+  peek: vi.fn(async (..._args: unknown[]) => {}),
 }));
 
 vi.mock("$shared/ipc/bindings", async () => {
@@ -36,7 +39,7 @@ vi.mock("$shared/ipc/bindings", async () => {
     pagePermissionCardHost: native.host,
     tabsBootstrap: async () => {},
     sidebarSetHidden: native.hidden,
-    sidebarPeek: async () => {},
+    sidebarPeek: native.peek,
     sidebarSetWidth: async () => {},
     sidebarResize: async () => false,
     sidebarResizeGuide: async () => true,
@@ -265,4 +268,73 @@ test("switched live, native hears the bar's measured height and never a bar of n
   }
   expect(native.layout.mock.calls.filter(([height]) => height === 0)).toEqual([]);
   expect(native.layout).toHaveBeenCalledTimes(4);
+});
+
+test("the card comes out at the window's edge once the pointer has left the bar", async () => {
+  await across("dark");
+  await settle();
+  const bar = document.querySelector<HTMLElement>("[data-top-bar]")!;
+  const edge = (near: boolean) =>
+    globalThis.dispatchEvent(new CustomEvent("zephium:sidebar-edge", { detail: { near } }));
+  const peeked = () => native.peek.mock.calls.some(([peek]) => peek === true);
+  native.peek.mockClear();
+
+  // Along the bar's leading end the pointer is reaching for the bar.
+  bar.dispatchEvent(new PointerEvent("pointermove", { bubbles: true }));
+  edge(true);
+  edge(false);
+  expect(peeked()).toBe(false);
+
+  // Then down onto the page, which takes every move from there: the chrome
+  // last saw the pointer in the bar, and must not go on believing it.
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  edge(true);
+  await expect.poll(peeked).toBe(true);
+  edge(false);
+});
+
+test("in Work the bar keeps its strip and leaves the address to the tab opened over the canvas", async () => {
+  // A tab opened over Work's canvas brings its own address input, the one
+  // native's barrier reads; a hidden one in the bar would be found first.
+  const { all } = await across("dark");
+  await settle();
+  expect(document.querySelectorAll("[data-zephium-address]")).toHaveLength(1);
+  emitNativeEvent("uiCommand", "browser.work");
+  await expect.poll(() => surface.currentPage()).toBe("work");
+  await expect.poll(() => document.querySelector("[data-work-stage-stub]")).not.toBeNull();
+  expect(document.querySelector("[data-top-bar]")).not.toBeNull();
+  expect(document.querySelectorAll("[data-zephium-address]")).toHaveLength(0);
+  expect(document.querySelectorAll("[data-zephium-tab-id]")).toHaveLength(all.length);
+
+  emitNativeEvent("uiCommand", "browser.return");
+  await expect.poll(() => surface.currentPage()).toBeNull();
+  expect(document.querySelectorAll("[data-top-bar] [data-zephium-address]")).toHaveLength(1);
+  expect(document.querySelectorAll("[data-zephium-address]")).toHaveLength(1);
+});
+
+test("on a solid ground the gutters are painted round the page, never over it", async () => {
+  // Solid, under the bar: macOS raises a panel by bringing the whole chrome
+  // view over the page, so only the ring round the page may be painted.
+  document.documentElement.dataset.material = "none";
+  try {
+    const { screen } = await across("light");
+    await settle();
+    const stage = document.querySelector<HTMLElement>(".stage-column")!;
+    const ring = () => getComputedStyle(stage, "::before");
+    // The body here wears the harness's stand-in for the window itself.
+    for (const element of [document.documentElement, document.querySelector(".shell")!, stage])
+      expect(getComputedStyle(element).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+    expect(ring().boxShadow).toMatch(/^rgb\(/u);
+    expect(ring().backgroundColor).toBe("rgba(0, 0, 0, 0)");
+    // The page stands a gutter under the bar, from the window's gutter on
+    // the left while the column waits beneath it.
+    expect(ring().top).toBe("8px");
+    expect(ring().left).toBe("0px");
+
+    // Beside the pinned column the page keeps a gutter from it as well.
+    await screen.getByRole("button", { name: "Toggle sidebar", exact: true }).first().click();
+    await expect.poll(() => ring().left).toBe("8px");
+  } finally {
+    delete document.documentElement.dataset.material;
+  }
 });

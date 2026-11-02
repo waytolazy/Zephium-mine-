@@ -300,7 +300,14 @@
   // panel opening sends a card that is out away without a word to native:
   // lowering it would lower the panel too. The window's edge runs up past the
   // bar's leading end as well, where the pointer is reaching for the bar.
+  // The chrome hears no move once the pointer is over the page, so where it
+  // was last seen goes stale at once: flush, the bar meets the page and no
+  // other chrome is in view, and a pointer seen in the bar would otherwise
+  // never bring the card out at all. Only a move just now counts.
+  const BAR_REACH_MS = 120;
   let inBar = false;
+  let seenAt = 0;
+  const reachingBar = () => inBar && performance.now() - seenAt < BAR_REACH_MS;
   $effect(() => {
     if (raisedPanel() === null) return;
     untrack(() => {
@@ -313,6 +320,7 @@
   $effect(() => {
     const follow = (event: PointerEvent) => {
       inBar = event.target instanceof Element && !!event.target.closest("[data-top-bar]");
+      seenAt = performance.now();
     };
     const gone = () => (inBar = false);
     window.addEventListener("pointermove", follow, { passive: true });
@@ -325,7 +333,7 @@
   $effect(() => {
     const edge = (event: Event) => {
       if (!(event instanceof CustomEvent) || typeof event.detail?.near !== "boolean") return;
-      if (event.detail.near && (inBar || raisedPanel() !== null)) return;
+      if (event.detail.near && (reachingBar() || raisedPanel() !== null)) return;
       atEdge = event.detail.near;
       if (!away) return;
       if (atEdge) peek();
@@ -533,7 +541,11 @@
     data-launch={motion.launchState()}
   >
     {#key compact}<div class="sidebar-browser-column" class:sidebar-tool-rail={paneled}>
-        {#if settings && IS_MAC}<div class="sidebar-lights" aria-hidden="true"></div>{/if}
+        <!-- Under the top bar the lights are in the bar, and so is their row. -->
+        {#if settings && IS_MAC && !horizontal()}<div
+            class="sidebar-lights"
+            aria-hidden="true"
+          ></div>{/if}
         {@render browserBody(compact)}
         {@render dock(compact)}
       </div>{/key}

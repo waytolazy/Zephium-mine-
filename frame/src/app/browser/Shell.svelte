@@ -742,11 +742,34 @@
 
 <style>
   .stage-column {
+    position: relative;
     display: flex;
     flex: 1;
     flex-direction: column;
     min-width: 0;
     min-height: 0;
+  }
+
+  /* A solid ground is the window's own colour on every part of the chrome
+     but the page: a ring round the rect native puts the page in, beneath the
+     column and the bar, never the document itself (global.css). macOS brings
+     the whole chrome view over the page to raise a panel or the card, and
+     the page shows through the ring's middle all the while. A page the frame
+     draws has nothing native beneath it, and the ring closes over it. */
+  :global(:root:is([data-material="none"], [data-look="flat"])) .stage-column::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset-block: var(--page-top, 0) 0;
+    inset-inline: var(--page-start, var(--window-gutter)) 0;
+    border-radius: var(--content-radius);
+    background: var(--page-hole, transparent);
+    box-shadow: 0 0 0 100vmax var(--color-chrome);
+    pointer-events: none;
+  }
+
+  .stage-column:has(> :global(main)) {
+    --page-hole: var(--color-chrome);
   }
 
   /* The bar across the top is the first row and starts at the window's very
@@ -767,6 +790,13 @@
     grid-row: 2;
     grid-column: 2;
     padding-block-start: var(--window-gutter);
+
+    --page-top: var(--window-gutter);
+  }
+
+  /* Out of the row, the column leaves the page no gap at its start. */
+  .shell:has(> :global(.browser-sidebar:is([data-hidden], [data-leaving]))) > .stage-column {
+    --page-start: 0px;
   }
 
   /* macOS edges every page view with a hairline of its own, and flush it

@@ -94,3 +94,21 @@ for (const mode of ["dark", "light"] as const)
     expect(getComputedStyle(field).boxShadow).toMatch(/inset/u);
     delete document.documentElement.dataset.theme;
   });
+
+// The flat look is opaque whatever material is installed, and paints that
+// ground on what it draws rather than on the document, so the sky page fills
+// its openings with the chrome's colour instead of leaving the glass to show.
+for (const look of ["soft", "flat"] as const)
+  test(`the sky page's openings over glass, ${look}`, async () => {
+    native.settings = {};
+    document.documentElement.dataset.material = "liquid_glass";
+    document.documentElement.dataset.look = look;
+    await preferences.init();
+    const screen = await render(PlainStage, {});
+    await expect.poll(() => screen.container.querySelector(".newtab")).not.toBeNull();
+    const ground = getComputedStyle(screen.container.querySelector(".newtab")!).backgroundColor;
+    if (look === "soft") expect(ground).toBe("rgba(0, 0, 0, 0)");
+    else expect(ground).not.toBe("rgba(0, 0, 0, 0)");
+    delete document.documentElement.dataset.material;
+    delete document.documentElement.dataset.look;
+  });

@@ -255,10 +255,25 @@ test("a drop lands where native can place it, never before a tab of another list
   const pinned = row("p1").getBoundingClientRect();
   const again = row("b").querySelector("button")!;
   const home = again.getBoundingClientRect();
-  press(again, { x: home.left + 20, y: home.top + 15 }, { x: pinned.left + 4, y: pinned.top + 15 })();
+  press(
+    again,
+    { x: home.left + 20, y: home.top + 15 },
+    { x: pinned.left + 4, y: pinned.top + 15 },
+  )();
   await frame();
   expect(native.setEssential).toHaveBeenCalledTimes(1);
   expect(native.drop).not.toHaveBeenCalled();
+});
+
+test("a drag whose release made no click leaves the next click a click", async () => {
+  const { screen, row, onSelect } = await strip(["a", "b"].map((id) => site(id)));
+  const handle = row("b").querySelector("button")!;
+  const from = handle.getBoundingClientRect();
+  // Let go over the page, away from the row: no click follows the release.
+  press(handle, { x: from.left + 20, y: from.top + 15 }, { x: from.left + 20, y: 180 })();
+  expect(onSelect).not.toHaveBeenCalled();
+  await screen.getByRole("button", { name: "Tab a", exact: true }).click();
+  expect(onSelect).toHaveBeenLastCalledWith("a");
 });
 
 test("let go off the strip, the tab is native's to place", async () => {
