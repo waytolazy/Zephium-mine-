@@ -310,7 +310,8 @@ horizontal layout:
   (`true` | `false`), frame default `"false"`, included in the diagnostic
   report's appearance keys if that list enumerates `ui.*` keys.
 - `ui.newtab-background` admits a third value, `plain`: a flat page in
-  `--color-page` with the search field centred on it and nothing else: no sky,
+  `--color-page` with the search field centred on it, the customize gear in
+  the top-end corner and a drag band along its top, and nothing else: no sky,
   no sky light (`skyShown` is false for `plain`), no wordmark, greeting,
   clock, figures or notch; the content toggles are disabled in the New Tab
   settings while `plain` is chosen. `NewTab.svelte` branches on it early, with
@@ -393,4 +394,6 @@ fact, so no component carries a preference conditional.
   so the flat look can be plain black-grey without the custom editor. Nothing
   selects it automatically.
 - **Plain new tab under flat**: the search field is a box with a hairline
-  border on the page colour, nothing else on the page.
+  border on the page colour. The page keeps only its customize gear in the
+  top-end corner, so it can reach its own settings, and a 50px band along
+  its top that moves the window.
