@@ -35,7 +35,7 @@ fn revision_current(revision: u64) -> bool {
 // reachable underneath it.
 const HOT_WIDTH: f64 = 8.0;
 /// The chrome draws the window's gutter before the column, so the column's
-/// edge is this far in from the chrome's own.
+/// edge is this far in from the chrome's own, unless the window is flush.
 const GUTTER: f64 = 8.0;
 const HOT_INSET: f64 = 2.0;
 /// The guide's width, a split guide's.
@@ -239,10 +239,13 @@ impl Control {
         };
         let frame = chrome.frame();
         let width = self.ivars().width.get();
-        let hidden = !self.ivars().enabled.get() || frame.size.width + 0.5 < GUTTER + width;
+        let Column { gutter, top } = column();
+        let hidden = !self.ivars().enabled.get() || frame.size.width + 0.5 < gutter + width;
+        // AppKit's origin is the foot, so a top bar takes the zone's top
+        // away: what the bar holds above the column's edge stays the bar's.
         let target = NSRect::new(
-            NSPoint::new(frame.origin.x + GUTTER + width - HOT_INSET, frame.origin.y),
-            NSSize::new(HOT_WIDTH, frame.size.height),
+            NSPoint::new(frame.origin.x + gutter + width - HOT_INSET, frame.origin.y),
+            NSSize::new(HOT_WIDTH, (frame.size.height - top).max(0.0)),
         );
         let current = self.frame();
         if current.size.height != target.size.height {
@@ -279,17 +282,17 @@ impl Control {
         };
         let generation = self.ivars().generation.get();
         let frame = chrome.frame();
-        let height = if dragging {
-            frame.size.height
-        } else {
-            28.0_f64.min(frame.size.height)
-        };
+        let Column { gutter, top } = column();
+        // The column's own height, which a top bar stands above.
+        let tall = (frame.size.height - top).max(0.0);
+        let height = if dragging { tall } else { 28.0_f64.min(tall) };
         // Centred in the gap between the column and the page, as a split's
-        // guide is centred in the strip between its panes.
+        // guide is centred in the strip between its panes; on the edge itself
+        // in a flush window, which has no gap.
         let target = NSRect::new(
             NSPoint::new(
-                frame.origin.x + GUTTER + width + GUTTER / 2.0 - GUIDE_WIDTH / 2.0,
-                frame.origin.y + (frame.size.height - height) / 2.0,
+                frame.origin.x + gutter + width + gutter / 2.0 - GUIDE_WIDTH / 2.0,
+                frame.origin.y + (tall - height) / 2.0,
             ),
             NSSize::new(GUIDE_WIDTH, height),
         );
@@ -481,9 +484,52 @@ impl Control {
     }
 }
 
+/// Where the column stands in the chrome besides its width: past the
+/// window's gutter, which a flush window closes, and below a top bar, which
+/// takes the chrome's top.
+#[derive(Clone, Copy)]
+struct Column {
+    gutter: f64,
+    top: f64,
+}
+
 thread_local! {
     static CONTROL: RefCell<Option<(u64, Retained<Control>)>> = const { RefCell::new(None) };
     static CONFIG_EPOCH: Cell<u64> = const { Cell::new(0) };
+    static COLUMN: Cell<Column> = const {
+        Cell::new(Column {
+            gutter: GUTTER,
+            top: 0.0,
+        })
+    };
+}
+fn column() -> Column {
+    COLUMN.with(Cell::get)
+}
+/// The window is flush, with no gutter before the column, or keeps it.
+pub(super) fn set_flush(flush: bool) {
+    let gutter = if flush { 0.0 } else { GUTTER };
+    COLUMN.with(|column| {
+        column.set(Column {
+            gutter,
+            ..column.get()
+        })
+    });
+    refresh();
+}
+/// A top bar of this height stands over the column, or none does.
+pub(super) fn set_top_bar(height: Option<f64>) {
+    let top = height
+        .filter(|height| height.is_finite())
+        .unwrap_or(0.0)
+        .max(0.0);
+    COLUMN.with(|column| {
+        column.set(Column {
+            top,
+            ..column.get()
+        })
+    });
+    refresh();
 }
 fn configuration_current(epoch: u64, generation: u64, revision: u64) -> bool {
     CONFIG_EPOCH.with(|current| current.get() == epoch)

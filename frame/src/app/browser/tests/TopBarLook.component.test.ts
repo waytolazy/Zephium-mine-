@@ -27,12 +27,13 @@ const native = vi.hoisted(() => ({
     ) => {},
   ),
   hidden: vi.fn(async (_hidden: boolean) => {}),
+  host: vi.fn(async (_available: boolean) => {}),
 }));
 
 vi.mock("$shared/ipc/bindings", async () => {
   const { mockBindings } = await import("$shared/testing/bindings");
   return mockBindings({
-    pagePermissionCardHost: async () => {},
+    pagePermissionCardHost: native.host,
     tabsBootstrap: async () => {},
     sidebarSetHidden: native.hidden,
     sidebarPeek: async () => {},
@@ -193,4 +194,75 @@ test("the profile's stack drops over the page with the chrome raised for it", as
 
   trigger.click();
   await expect.poll(() => native.raise.mock.calls.at(-1)?.[0]).toBe(false);
+});
+
+test("a page's question is asked in the column only while the column is in view", async () => {
+  const hosting = () => native.host.mock.calls.at(-1)?.[0] ?? false;
+  const { screen } = await across("light");
+  await settle();
+  // Beneath the page as a card, the column is nowhere to be seen: native
+  // asks in its sheet instead.
+  expect(hosting()).toBe(false);
+
+  const toggle = screen.getByRole("button", { name: "Toggle sidebar", exact: true }).first();
+  await toggle.click();
+  await expect.poll(hosting).toBe(true);
+  await toggle.click();
+  await expect.poll(hosting).toBe(false);
+
+  // The same holds for a column put away beside the page.
+  chrome.adoptLayout("vertical");
+  sidebar.followLayout();
+  sidebar.setMode("hidden");
+  // The page covers the column before it becomes the card.
+  await expect
+    .poll(() => document.querySelector(".browser-sidebar")!.hasAttribute("data-hidden"))
+    .toBe(true);
+  expect(hosting()).toBe(false);
+  sidebar.setMode("default");
+  await expect.poll(hosting).toBe(true);
+});
+
+test("switched live, native hears the bar's measured height and never a bar of none", async () => {
+  await page.viewport(1200, 720);
+  launch.dispose();
+  await surface.init();
+  await tabs.init();
+  await favicons.init();
+  const { tabs: all, nodes } = window();
+  emitNativeEvent("itemsChanged", {
+    projection_revision: revision((projection += 1)),
+    profile: null,
+    spaces: [],
+    active_space_id: null,
+    nodes,
+    tabs: all,
+    active: "x",
+    split_group: null,
+  });
+  flushSync();
+  await render(Shell);
+  expect(document.querySelectorAll("[data-zephium-address]")).toHaveLength(1);
+
+  // As Settings switches it: the shape, then where the column stands in it.
+  const switchTo = (layout: "vertical" | "horizontal") => {
+    chrome.adoptLayout(layout);
+    sidebar.followLayout();
+    flushSync();
+  };
+  for (let round = 0; round < 2; round += 1) {
+    switchTo("horizontal");
+    const bar = document.querySelector<HTMLElement>("[data-top-bar]")!;
+    expect(native.layout.mock.calls.at(-1)).toEqual([bar.offsetHeight]);
+    // Exactly one address and one row per tab, mid-switch included.
+    expect(document.querySelectorAll("[data-zephium-address]")).toHaveLength(1);
+    expect(document.querySelectorAll("[data-zephium-tab-id]")).toHaveLength(all.length);
+    switchTo("vertical");
+    expect(native.layout.mock.calls.at(-1)).toEqual([null]);
+    expect(document.querySelector("[data-top-bar]")).toBeNull();
+    expect(document.querySelectorAll("[data-zephium-address]")).toHaveLength(1);
+    expect(document.querySelectorAll("[data-zephium-tab-id]")).toHaveLength(all.length);
+  }
+  expect(native.layout.mock.calls.filter(([height]) => height === 0)).toEqual([]);
+  expect(native.layout).toHaveBeenCalledTimes(4);
 });

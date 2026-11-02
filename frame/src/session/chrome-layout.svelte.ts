@@ -14,7 +14,9 @@ export type ChromeLook = "soft" | "flat";
 
 let layout = $state.raw<ChromeLayout>("vertical");
 /** The bar's height in chrome points, from the window's top to the bar's
- *  foot, bookmarks row included. Zero until the bar has been measured. */
+ *  foot, bookmarks row included. Zero until the bar in the document has been
+ *  measured, and again once it goes: a bar that comes back is measured anew,
+ *  since the look or the bookmarks row may have changed its height meanwhile. */
 let barHeight = $state.raw(0);
 let published: string | null = null;
 /** What native was last told. It starts every window soft and remembers
@@ -26,7 +28,12 @@ export const horizontal = () => layout === "horizontal";
 export const topBarHeight = () => barHeight;
 
 function publish() {
-  const next = layout === "horizontal" ? Math.max(0, Math.round(barHeight)) : null;
+  // A bar not yet measured would have native tile the page at the window's
+  // very top, under the bar, and then move it down again a frame later
+  // without the slide. The bar measures itself as it mounts, in the same
+  // pass, and that report is what tells native the new shape.
+  if (layout === "horizontal" && barHeight <= 0) return;
+  const next = layout === "horizontal" ? Math.round(barHeight) : null;
   const key = String(next);
   if (key === published) return;
   published = key;
@@ -37,6 +44,7 @@ function publish() {
 export function adoptLayout(next: ChromeLayout) {
   if (next === layout) return;
   layout = next;
+  if (next === "vertical") barHeight = 0;
   publish();
 }
 
@@ -48,13 +56,14 @@ export function adoptLook(next: ChromeLook) {
   void commands.chromeSetFlush(next === "flat");
 }
 
-/** The bar reports its own height as it is laid out; a vertical chrome has no bar. */
+/** The bar reports its own height as it is laid out; a vertical chrome has
+ *  no bar, and what a bar on its way out reports is not kept. */
 export function reportBarHeight(height: number) {
-  if (!Number.isFinite(height) || height < 0) return;
+  if (layout !== "horizontal" || !Number.isFinite(height) || height < 0) return;
   const rounded = Math.round(height);
   if (rounded === barHeight) return;
   barHeight = rounded;
-  if (layout === "horizontal") publish();
+  publish();
 }
 
 /** Tests only: forget what was published, so the next change is sent again. */

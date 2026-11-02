@@ -644,10 +644,11 @@ thread_local! {
         std::cell::RefCell::new(std::collections::HashSet::new());
 }
 
-/// The chrome is a bar across the top, or the column beside the page again.
-/// Read on the UI thread, where the caption is laid out.
-pub fn chrome_top_bar(window: &WebviewWindow, on: bool) {
+/// The chrome is a bar of this height across the top, or the column beside
+/// the page again. Read on the UI thread, where the caption is laid out.
+pub fn chrome_top_bar(window: &WebviewWindow, top_bar: Option<f64>) {
     let owner = window.clone();
+    let on = top_bar.is_some();
     let _ = window.run_on_main_thread(move || {
         TOP_BARS.with(|windows| {
             let mut windows = windows.borrow_mut();
@@ -693,19 +694,22 @@ struct ChromeAdapter {
 impl Chrome for ChromeAdapter {
     fn position(&self, frame: ChromeFrame) -> bool {
         let window = self.window.clone();
-        let hidden = HIDDEN_SIDEBARS.with(|windows| windows.borrow().contains(self.window.label()));
-        let edge = if hidden {
-            zephium_core::layout::hidden_card_edge(frame.rect.width)
-        } else {
-            frame.rect.width
-        };
-        let page_left = (!frame.fill_width).then_some(frame.rect.x + edge);
         self.window
             .run_on_main_thread(move || {
+                // Both sets are the UI thread's own: read on the actor, which
+                // places the chrome, they are always empty.
+                let label = window.label();
+                let hidden = HIDDEN_SIDEBARS.with(|windows| windows.borrow().contains(label));
                 // A top bar fills the window, so no page meets the window's
                 // top: the caption keeps to the corner, as over a new tab.
-                let top_bar = TOP_BARS.with(|windows| windows.borrow().contains(window.label()));
-                caption::set_page_left(&window, page_left.filter(|_| !top_bar));
+                let top_bar = TOP_BARS.with(|windows| windows.borrow().contains(label));
+                let edge = if hidden {
+                    zephium_core::layout::hidden_card_edge(frame.rect.width)
+                } else {
+                    frame.rect.width
+                };
+                let page_left = (!frame.fill_width && !top_bar).then_some(frame.rect.x + edge);
+                caption::set_page_left(&window, page_left);
             })
             .is_ok()
     }

@@ -62,11 +62,11 @@
   --color-tile-hover: rgb(255 255 255 / 0.1);
   --color-address: rgb(255 255 255 / 0.065);
   --color-address-hover: rgb(255 255 255 / 0.095);
-  --shadow-tile: none;
+  --shadow-tile: 0 0 transparent;
 
   /* A grouped card's edge. On a dark page the luminance step is the edge; on
      a light one white on pale grey needs a hairline to stay crisp. */
-  --shadow-card: none;
+  --shadow-card: 0 0 transparent;
 
   --newtab-image-dim: rgb(0 0 0 / 35%);
   --color-border: rgb(255 255 255 / 0.07);
@@ -384,10 +384,15 @@
      problem in each theme and so a different value, not a different rule. On a
      dark ground a control is lighter than its surface and needs nothing; on a
      light one it is lighter too, which reads as flat, so it takes a whisper of
-     a drop. Either way the separation is never a drawn edge. */
-  --shadow-control: none;
-  --shadow-control-strong: none;
-  --shadow-field: none;
+     a drop. Either way the separation is never a drawn edge.
+
+     A shadow that is nothing is written "0 0 transparent", never "none":
+     these are composed into lists ("var(--shine), var(--shadow-tile)"), and
+     one "none" in a list voids the whole declaration, light and hairline
+     with it. */
+  --shadow-control: 0 0 transparent;
+  --shadow-control-strong: 0 0 transparent;
+  --shadow-field: 0 0 transparent;
   --shadow-field-focus: inset 0 0 0 1px var(--color-field-ring);
   --shadow-raise: inset 0 0 0 1px rgb(255 255 255 / 0.05), inset 0 1px 0 0 rgb(255 255 255 / 0.06);
 
@@ -676,7 +681,7 @@
      own are; a darker one reads as a control that is switched off. */
   --color-address: var(--lift);
   --color-address-hover: var(--lift-pressed);
-  --shadow-tile: none;
+  --shadow-tile: 0 0 transparent;
   --shadow-card: 0 0 0 0.5px rgb(24 24 27 / 0.07), 0 1px 1.5px rgb(24 24 27 / 0.03);
 
   --color-border: var(--ink-a7);
@@ -795,7 +800,7 @@
 
   --shadow-control: 0 0.5px 1.5px rgb(24 24 27 / 0.1), 0 0 0 0.5px rgb(24 24 27 / 0.07);
   --shadow-control-strong: 0 1px 3px rgb(24 24 27 / 0.13), 0 0 0 0.5px rgb(24 24 27 / 0.09);
-  --shadow-field: none;
+  --shadow-field: 0 0 transparent;
   --shadow-field-focus: inset 0 0 0 1px var(--color-field-ring);
   --shadow-raise: inset 0 0 0 1px rgb(24 24 27 / 0.07), inset 0 -1px 0 0 rgb(24 24 27 / 0.05);
   --shadow-track: inset 0 1px 2px rgb(24 24 27 / 0.1), inset 0 0 0 1px rgb(24 24 27 / 0.04);

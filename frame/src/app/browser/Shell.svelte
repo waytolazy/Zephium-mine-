@@ -36,7 +36,7 @@
   import { RailSpaces, SpaceBar } from "$features/tabs";
   import * as tabDrag from "$session/tab-drag.svelte";
   import { requestTab } from "$session/work-tab.svelte";
-  import { expanded as sidebarWidth } from "$session/sidebar-mode.svelte";
+  import { expanded as sidebarWidth, isHidden as columnAway } from "$session/sidebar-mode.svelte";
   import { horizontal, topBarHeight } from "$session/chrome-layout.svelte";
   import TopBar from "./TopBar.svelte";
   import { uiCommands as ui } from "$domain/ui-commands";
@@ -408,6 +408,9 @@
               {#if space}<div class="bar-rail-spaces"><RailSpaces active={space} /></div>{/if}
             {:else}
               {#if space}<SpaceBar />{/if}
+              <!-- Only a column in view hosts a page's question; beneath the
+                   page, native asks in a sheet instead. -->
+              {#if !columnAway()}<SidebarPagePermission />{/if}
               <HidingBar />
               {#if splitting}<p
                   class="shrink-0 px-3 pb-1 text-[12px] text-accent"
@@ -449,8 +452,10 @@
             because everything in it acts on the page the field names.
           -->
               <AddressField {compact} trailing={addressTray} />
-              <!-- Work floats its page over the whole window, sidebar included. -->
-              {#if !inWork}<SidebarPagePermission />{/if}
+              <!-- Work floats its page over the whole window, sidebar included.
+                   A column waiting beneath the page as a card is not in view
+                   to ask from: native asks in a sheet then. -->
+              {#if !inWork && !columnAway()}<SidebarPagePermission />{/if}
 
               <HidingBar />
               {#if splitting}<p

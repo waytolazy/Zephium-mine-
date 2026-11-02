@@ -123,6 +123,22 @@ test("every tab is one row with its title, kept and pinned ones as marks", async
   expect(row("a").getBoundingClientRect().width).toBeGreaterThan(56);
 });
 
+test("the strip's ground past its tabs moves the window; its tabs never do", async () => {
+  const { row, list } = await strip(["a", "b"].map((id) => site(id)));
+  // Few tabs leave most of the bar's row to the strip: that room is where a
+  // window is dragged from, as in any tab strip.
+  const last = row("b").getBoundingClientRect();
+  const room = list.getBoundingClientRect();
+  expect(room.right - last.right).toBeGreaterThan(200);
+  const ground = document.elementFromPoint(last.right + 100, last.top + 15)!;
+  expect(ground).toBe(list);
+  expect(ground.getAttribute("data-tauri-drag-region")).toBe("");
+  for (const button of row("a").querySelectorAll("button")) {
+    expect(button.closest("[data-tauri-drag-region]")).toBe(list);
+    expect(button.hasAttribute("data-tauri-drag-region")).toBe(false);
+  }
+});
+
 test("a click chooses a tab, kept sites included", async () => {
   const { screen, onSelect } = await strip(["a", "b"].map((id) => site(id)));
   await screen.getByRole("button", { name: "Tab b", exact: true }).click();
@@ -222,6 +238,27 @@ test("onto a kept site keeps the tab; let go where it stood, nothing moves", asy
   press(again, { x: home.left + 20, y: home.top + 15 }, { x: home.left + 24, y: home.top + 15 })();
   await frame();
   expect(native.setEssential).toHaveBeenCalledTimes(1);
+});
+
+test("a drop lands where native can place it, never before a tab of another list", async () => {
+  const { row } = await strip(["a", "b", "c"].map((id) => site(id)));
+  const handle = row("c").querySelector("button")!;
+  const from = handle.getBoundingClientRect();
+  // The far half of the last kept site: the strip's next tab is pinned, and
+  // native refuses to put a kept site before it. The tab is kept, last.
+  const last = row("k2").getBoundingClientRect();
+  press(handle, { x: from.left + 20, y: from.top + 15 }, { x: last.right - 4, y: last.top + 15 })();
+  await expect.poll(() => native.setEssential.mock.calls.length).toBe(1);
+  expect(native.setEssential).toHaveBeenLastCalledWith("c", true, null);
+
+  // Onto a pinned tab: no list there takes it, so it stays where it was.
+  const pinned = row("p1").getBoundingClientRect();
+  const again = row("b").querySelector("button")!;
+  const home = again.getBoundingClientRect();
+  press(again, { x: home.left + 20, y: home.top + 15 }, { x: pinned.left + 4, y: pinned.top + 15 })();
+  await frame();
+  expect(native.setEssential).toHaveBeenCalledTimes(1);
+  expect(native.drop).not.toHaveBeenCalled();
 });
 
 test("let go off the strip, the tab is native's to place", async () => {

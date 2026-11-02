@@ -7,6 +7,8 @@ import { emitNativeEvent } from "$shared/testing/native-events";
 import { revision, spaceFixture, tabFixture } from "$shared/testing/fixtures";
 import { tabs } from "$domain/tabs";
 import { uiCommands } from "$domain/ui-commands";
+import * as sidebar from "$session/sidebar-mode.svelte";
+import * as chrome from "$session/chrome-layout.svelte";
 import SidebarBody from "../components/SidebarBody.svelte";
 import { sidebarTree } from "../lib/sidebar-model";
 
@@ -18,6 +20,7 @@ const native = vi.hoisted(() => ({
   update: vi.fn(),
   remove: vi.fn(),
   reorder: vi.fn(),
+  hidden: vi.fn(async (_hidden: boolean) => {}),
 }));
 
 vi.mock("$shared/ipc/bindings", async () => {
@@ -33,6 +36,9 @@ vi.mock("$shared/ipc/bindings", async () => {
     spacesDelete: native.remove.mockImplementation(ok),
     spacesReorder: native.reorder.mockImplementation(ok),
     keymapEntries: async () => [],
+    sidebarSetWidth: async () => {},
+    sidebarSetHidden: native.hidden,
+    chromeSetLayout: async () => {},
   });
 });
 
@@ -229,6 +235,30 @@ test("New Space makes one at once, with no icon, and opens it to be named", asyn
 
   emitNativeEvent("uiCommand", "space.edit");
   await expect.element(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Space 3");
+});
+
+test("a menu asking for a space while the column waits beneath the page brings the column out for it", async () => {
+  // Under the top bar the column is a card beneath the page unless something
+  // stands it beside the page; the menu bar's Spaces menu reaches it there.
+  chrome.adoptLayout("horizontal");
+  sidebar.followLayout();
+  try {
+    const screen = await mount();
+    expect(sidebar.isHidden()).toBe(true);
+    emitNativeEvent("uiCommand", "space.edit");
+    await expect.element(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Home");
+    expect(sidebar.isHidden()).toBe(false);
+    expect(native.hidden).toHaveBeenLastCalledWith(false);
+
+    // Done with the space, the column goes back beneath the page.
+    await userEvent.keyboard("{Escape}");
+    await expect.poll(() => sidebar.isHidden()).toBe(true);
+    expect(native.hidden).toHaveBeenLastCalledWith(true);
+  } finally {
+    chrome.adoptLayout("vertical");
+    sidebar.followLayout();
+    chrome.resetChromeLayout();
+  }
 });
 
 test("a space with nothing listed draws no empty state; the row's plus still opens a tab", async () => {

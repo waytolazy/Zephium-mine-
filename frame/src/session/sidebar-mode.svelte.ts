@@ -266,7 +266,10 @@ export function setMode(next: SidebarMode) {
 export function expandBriefly(): () => void {
   cancelSidebarResize();
   if (horizontal()) {
-    if (pinned || held) return () => {};
+    // A hold is no reason to skip the pin: what holds the column is usually
+    // closing to make way for what asked (a space flow closes the tool it
+    // was asked from), and the column must still be in view after it goes.
+    if (pinned) return () => {};
     const pin = {};
     briefPin = pin;
     pinned = true;

@@ -3,6 +3,7 @@
   import { Folder01Icon, Globe02Icon } from "@hugeicons/core-free-icons";
   import type { BookmarkView } from "$shared/ipc/bindings";
   import { commands } from "$shared/ipc/bindings";
+  import { browserImport } from "$domain/browser-import";
   import { favicons } from "$domain/favicons";
   import { tabs } from "$domain/tabs";
   import { uiCommands } from "$domain/ui-commands";
@@ -22,6 +23,8 @@
   const MENU_WIDTH = 280;
   const MENU_GAP = 6;
   const MENU_MARGIN = 8;
+  /** How long a link taken off the bar can be put back, as in the panel. */
+  const UNDO_WINDOW = 6000;
 
   const menuOwner = Symbol("bookmarks bar");
   let session = $state.raw(untrack(() => new BookmarksSession(profile)));
@@ -34,6 +37,11 @@
   let draft = $state("");
   let row = $state<HTMLElement>();
   let lower: (() => void) | null = null;
+  /** A link just deleted from the bar, kept long enough to put it back. */
+  let deleted = $state<{
+    item: { title: string; url: string; parent: string | null };
+    index: number | null;
+  } | null>(null);
 
   let empty = $derived(loaded && session.error === null && session.items.length === 0);
 
@@ -46,6 +54,7 @@
       loaded = false;
       closed(openFolder);
       folders = {};
+      deleted = null;
       void current.open(null).then(() => {
         if (session === current) loaded = true;
       });
@@ -73,6 +82,18 @@
   $effect(() => {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
+  });
+  // An import from another browser writes them natively too, and says so only
+  // through its own progress: read again as its bookmarks land.
+  const bookmarksImported = () =>
+    browserImport
+      .current()
+      ?.kinds.some((kind) => kind.kind === "bookmarks" && kind.state === "done") ?? false;
+  let imported = untrack(bookmarksImported);
+  $effect(() => {
+    const landed = bookmarksImported();
+    if (landed && !imported) untrack(refresh);
+    imported = landed;
   });
 
   /** A folder is read as it is reached, so its menu is full when it opens. */
@@ -116,6 +137,16 @@
     lower = null;
   }
 
+  // A folder taken away while its menu is open (deleted in the panel, or
+  // gone when the bar reads again) takes its menu with it without a word to
+  // this view; the chrome it raised over the page comes down all the same.
+  $effect(() => {
+    const id = openFolder;
+    if (id === null || !loaded) return;
+    if (!session.items.some((item) => item.id === id && item.url === null))
+      untrack(() => closed(id));
+  });
+
   // With the chrome across the top, the open menu hangs over the page: native
   // brings the chrome over it, measured once it is in the document, and again
   // as its listing arrives and as its opening settles.
@@ -144,6 +175,30 @@
   });
   onDestroy(() => lower?.());
 
+  // The row has no scrollbar to drag, so a wheel turned over it moves it
+  // sideways, as the tab strip does; a trackpad's own sideways travel is left
+  // to the browser. Not while a menu hangs from a chip: it stays with it.
+  $effect(() => {
+    const element = row;
+    if (!element) return;
+    const wheel = (event: WheelEvent) => {
+      if (openFolder !== null) return;
+      if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+      if (element.scrollWidth <= element.clientWidth) return;
+      event.preventDefault();
+      const unit =
+        event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? 16
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? element.clientWidth
+            : 1;
+      const step = event.deltaY * unit;
+      element.scrollBy({ left: getComputedStyle(element).direction === "rtl" ? -step : step });
+    };
+    element.addEventListener("wheel", wheel, { passive: false });
+    return () => element.removeEventListener("wheel", wheel);
+  });
+
   const hostOf = (url: string) => {
     try {
       return new URL(url).host;
@@ -151,7 +206,10 @@
       return url;
     }
   };
-  const nameOf = (item: BookmarkView) => item.title || hostOf(item.url ?? "");
+  // A folder brought in without a name is still named, so its chip and its
+  // menu are never announced as nothing.
+  const nameOf = (item: BookmarkView) =>
+    item.title || (item.url === null ? m.bookmarks_location() : hostOf(item.url));
 
   /** In the tab in front, or a tab of its own when none is. */
   function openHere(url: string) {
@@ -182,6 +240,30 @@
     if (keep && title && title !== item.title) await session.rename(item.id, title);
   }
 
+  // The native menu's Delete is one row from Rename and has no second
+  // press, so what it takes can be put back for a moment, as in the panel.
+  async function erase(item: BookmarkView) {
+    const at = session.items.findIndex((candidate) => candidate.id === item.id);
+    const outcome = await session.remove(item.id);
+    if (outcome === false || item.url === null) return;
+    deleted = {
+      item: { title: item.title, url: item.url, parent: item.parent },
+      index: at < 0 ? null : at,
+    };
+  }
+
+  async function undo() {
+    const last = deleted;
+    deleted = null;
+    if (last) await session.restore(last.item, last.index);
+  }
+
+  $effect(() => {
+    if (!deleted) return;
+    const timer = setTimeout(() => (deleted = null), UNDO_WINDOW);
+    return () => clearTimeout(timer);
+  });
+
   const focusAndSelect = (node: HTMLInputElement) => {
     node.focus();
     node.select();
@@ -208,7 +290,7 @@
         startRename(item);
         break;
       case "remove":
-        void session.remove(item.id);
+        void erase(item);
         break;
     }
   }
@@ -349,6 +431,13 @@
       {/each}
     </ul>
   {/if}
+  {#if deleted}
+    <p class="undo" role="status">
+      <span class="label"
+        >{m.bookmarks_deleted({ title: deleted.item.title || deleted.item.url })}</span
+      ><button type="button" class="chip" onclick={() => void undo()}>{m.bookmarks_undo()}</button>
+    </p>
+  {/if}
 </nav>
 
 <style>
@@ -368,6 +457,7 @@
     align-items: center;
     gap: 4px;
     box-sizing: border-box;
+    flex: 1;
     inline-size: 100%;
     block-size: 100%;
     min-inline-size: 0;
@@ -457,6 +547,32 @@
     font-size: var(--text-label);
     outline: none;
     box-shadow: var(--shadow-field-focus);
+  }
+
+  /* What was just deleted, at the row's end until it is put back or the
+     moment passes. */
+  .undo {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    max-inline-size: 50%;
+    margin: 0;
+    padding-inline: 8px 4px;
+    color: var(--color-muted);
+    font-size: var(--text-label);
+    white-space: nowrap;
+  }
+
+  .undo .label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .undo .chip {
+    flex: none;
+    color: var(--color-text);
+    font-weight: 500;
   }
 
   .hint {

@@ -38,7 +38,7 @@
      the hidden column is a bordered panel in the chrome's colour. */
   --sky-light: 0;
   --sidebar-card-ground: var(--color-chrome);
-  --sidebar-card-shadow: none;
+  --sidebar-card-shadow: 0 0 transparent;
 
   /* The switch keeps its disc and loses the glass it turns to while held. */
   --color-switch-glass: var(--color-switch-thumb);
@@ -64,29 +64,32 @@
 
 /* Edges are hairlines and nothing else. "0 0 transparent" is nothing,
    written as a shadow so a list it stands in still parses. Declared again on
-   a theme preview, so its hairlines are mixed from the preview's own ink. */
+   a theme preview, so its hairlines are mixed from the preview's own ink, and
+   named again for a chosen theme in light, whose own rims and drops
+   (palette.css) are declared one attribute more specifically than this. */
 :root[data-look="flat"],
+:root[data-look="flat"][data-palette][data-theme="light"],
 :root[data-look="flat"] [data-theme-scope] {
   --shadow-control: 0 0 transparent;
-  --shadow-control-strong: none;
-  --shadow-raise: none;
+  --shadow-control-strong: 0 0 transparent;
+  --shadow-raise: 0 0 transparent;
   --shadow-tile: 0 0 transparent;
-  --shadow-card: none;
-  --shadow-field: none;
+  --shadow-card: 0 0 transparent;
+  --shadow-field: 0 0 transparent;
   --shadow-raised: 0 0 0 1px var(--color-border);
   --shadow-float: 0 0 0 1px var(--color-border-strong);
   --shadow-popover: 0 0 0 1px var(--color-border-strong);
   --shadow-menu: 0 0 0 1px var(--color-border-strong);
   --shadow-overlay: 0 0 0 1px var(--color-border-strong);
-  --shadow-sheet: none;
+  --shadow-sheet: 0 0 transparent;
   --shadow-badge: 0 0 0 1px var(--color-border-strong);
   --shadow-track: inset 0 0 0 1px var(--color-border);
   --shadow-thumb: 0 0 0 1px var(--color-border-strong);
   --shadow-thumb-grab: 0 0 0 1px var(--color-border-strong);
-  --shadow-segment-thumb: none;
+  --shadow-segment-thumb: 0 0 transparent;
   --shadow-segment-thumb-card: 0 0 0 1px var(--color-border);
-  --row-rim: none;
-  --row-rim-ink: none;
+  --row-rim: 0 0 transparent;
+  --row-rim-ink: 0 0 transparent;
   --lift-rim: 0 0 transparent;
   --shine: 0 0 transparent;
   --shine-top: 0 0 transparent;

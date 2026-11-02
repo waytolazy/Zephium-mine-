@@ -277,8 +277,10 @@ pub struct Shell {
     browser_return_ready: bool,
     /// Set while the window lays out for a return that a queued command is about to change.
     browser_return_hidden: bool,
-    /// The window whose chrome a panel of its top bar holds over the page.
-    chrome_panel_raised: Option<WindowId>,
+    /// The window whose chrome is over its page, and for what: a hidden
+    /// sidebar's card or a panel of the top bar. Native keeps one raised
+    /// state, so whichever asked last holds it.
+    chrome_raised: Option<(WindowId, RaisedShape)>,
     browser_return: Option<browser_pages::PendingBrowserReturn>,
     work_pane: Option<work_pane::WorkPane>,
     work_pane_generation: u32,
@@ -518,7 +520,7 @@ impl Shell {
             browser_after_return: None,
             browser_return_ready: false,
             browser_return_hidden: false,
-            chrome_panel_raised: None,
+            chrome_raised: None,
             browser_return: None,
             work_pane: None,
             work_pane_generation: 0,
@@ -983,6 +985,7 @@ impl Shell {
                         let card = layout::hidden_card(win.size, win.mode, win.metrics);
                         let shape = RaisedShape::Card;
                         let _ = self.engine.raise_chrome(win.id, peek, card, shape, slide);
+                        self.chrome_raised = peek.then_some((win.id, shape));
                     }
                 }
             }
@@ -1007,8 +1010,8 @@ impl Shell {
                 }
                 let id = win.id;
                 // A panel of the bar has nothing to hang from once it goes.
-                if left_top_bar && self.chrome_panel_raised == Some(id) {
-                    self.chrome_panel_raised = None;
+                if left_top_bar && self.chrome_raised == Some((id, RaisedShape::Panel)) {
+                    self.chrome_raised = None;
                     let _ = self.engine.raise_chrome(
                         id,
                         false,
@@ -1037,7 +1040,7 @@ impl Shell {
                 // over the page, so it lowers the chrome instead.
                 let raised = raised && rect.width > 0.0 && rect.height > 0.0;
                 let id = win.id;
-                self.chrome_panel_raised = raised.then_some(id);
+                self.chrome_raised = raised.then_some((id, RaisedShape::Panel));
                 let _ = self
                     .engine
                     .raise_chrome(id, raised, rect, RaisedShape::Panel, false);

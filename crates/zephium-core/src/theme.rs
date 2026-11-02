@@ -479,6 +479,22 @@ mod tests {
         assert_eq!(json[5]["dark"]["accent"], "#88c0d0");
     }
 
+    /// The frame imports the presets from a file `export_typescript_bindings`
+    /// writes; a preset added or changed here without regenerating it would
+    /// paint one ground natively and check its CSS against another.
+    #[test]
+    fn the_frame_reads_exactly_the_exported_presets() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../frame/src/shared/ipc/theme-presets.json"
+        );
+        let committed = std::fs::read_to_string(path).expect("read theme-presets.json");
+        assert!(
+            committed == presets_json(),
+            "theme-presets.json is stale: run `cargo test -p zephium-desktop export_typescript_bindings`"
+        );
+    }
+
     #[test]
     fn mono_is_a_plain_grey_below_graphite() {
         let mono = preset("mono").expect("mono preset");

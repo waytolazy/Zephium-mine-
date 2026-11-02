@@ -252,10 +252,11 @@
       return;
     }
     // Native stacks the chrome over the page before the card slides in, so
-    // the slide is seen from its first frame.
+    // the slide is seen from its first frame. A bar's panel raised meanwhile
+    // holds native's one raised state now, so the card stays in for it.
     void commands.sidebarPeek(true, true, false).then(() =>
       requestAnimationFrame(() => {
-        if (away) peeking = true;
+        if (away && raisedPanel() === null) peeking = true;
       }),
     );
   }

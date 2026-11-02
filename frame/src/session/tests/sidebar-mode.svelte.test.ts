@@ -250,7 +250,9 @@ describe("with the tabs across the top", () => {
     across();
     expect(isHidden()).toBe(true);
     expect(hidden()).toBe(true);
-    expect(native.layout).toHaveBeenLastCalledWith(0);
+    // The bar says how tall it is once it is laid out; until then native
+    // keeps the shape it has rather than tiling under a bar of no height.
+    expect(native.layout).not.toHaveBeenCalledWith(0);
     expect(sidebarMode()).toBe(shape);
   });
 
@@ -315,5 +317,19 @@ describe("with the tabs across the top", () => {
     pinSidebar(true);
     again();
     expect(sidebarPinned()).toBe(true);
+  });
+
+  it("keeps the column out for a showing asked for as the tool holding it closes", () => {
+    // New Space from the rail beside a tool: the tool closes and its hold
+    // goes a moment after the column is asked to show the space's editor.
+    across();
+    holdShown(true);
+    const restore = expandBriefly();
+    holdShown(false);
+    expect(isHidden()).toBe(false);
+    expect(hidden()).toBe(false);
+    restore();
+    expect(isHidden()).toBe(true);
+    expect(hidden()).toBe(true);
   });
 });

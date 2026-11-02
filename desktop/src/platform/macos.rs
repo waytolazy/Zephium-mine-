@@ -656,11 +656,13 @@ pub fn sidebar_hidden(window: &WebviewWindow, hidden: bool) {
     });
 }
 
-/// The chrome is a bar across the top, or the column beside the page again.
-/// The bar keeps the window controls in its leading end, so a hidden sidebar
-/// gives them back to it; a column hidden again under no bar takes them.
-pub fn chrome_top_bar(window: &WebviewWindow, on: bool) {
+/// The chrome is a bar of this height across the top, or the column beside
+/// the page again. The bar keeps the window controls in its leading end, so
+/// a hidden sidebar gives them back to it; a column hidden again under no bar
+/// takes them.
+pub fn chrome_top_bar(window: &WebviewWindow, top_bar: Option<f64>) {
     let owner = window.clone();
+    let on = top_bar.is_some();
     let _ = window.run_on_main_thread(move || {
         let changed = TOP_BARS.with(|windows| {
             let mut windows = windows.borrow_mut();
@@ -670,11 +672,19 @@ pub fn chrome_top_bar(window: &WebviewWindow, on: bool) {
                 windows.remove(owner.label())
             }
         });
+        // The column stands below the bar, and so does its resize edge.
+        sidebar_resize::set_top_bar(top_bar);
         if changed && sidebar_is_hidden(&owner) {
             super::window_controls::set_in_card(&owner, false);
             super::window_controls::set_tucked(&owner, !on);
         }
     });
+}
+
+/// The window is flush or soft. Flush, the column meets the window's edge
+/// with no gutter before it, so its resize edge is that much further in.
+pub fn chrome_flush(window: &WebviewWindow, flush: bool) {
+    let _ = window.run_on_main_thread(move || sidebar_resize::set_flush(flush));
 }
 
 /// The hidden sidebar's card shows its window controls, or has begun to

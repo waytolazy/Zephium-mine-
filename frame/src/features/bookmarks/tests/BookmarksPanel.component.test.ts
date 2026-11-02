@@ -235,3 +235,23 @@ test("dragging a bookmark reorders it, and onto a folder files it there", async 
     }),
   );
 });
+
+test("a write made from another view, the bar, is read again in the open panel", async () => {
+  let titles = top;
+  native.call.mockImplementation(async (_profile: string, call: BookmarkCall) =>
+    call.kind === "list" && call.folder === null
+      ? { kind: "listing", folder: null, path: [], items: titles }
+      : answer(call),
+  );
+  const screen = await render(BookmarksPanel, { profile: "p", query: "" });
+  await expect.element(screen.getByRole("button", { name: /Rust docs/u })).toBeVisible();
+
+  // The bar keeps a session of its own; nothing native says the tree moved.
+  const { BookmarksSession } = await import("../lib/bookmarks-session.svelte");
+  const bar = new BookmarksSession("p");
+  await bar.open(null);
+  titles = top.filter((item) => item.id !== "3");
+  await bar.remove("3");
+  await expect.element(screen.getByRole("button", { name: /Rust docs/u })).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("button", { name: /Zephium/u })).toBeVisible();
+});

@@ -1503,6 +1503,67 @@ fn under_a_top_bar_the_chrome_fills_the_window_beneath_a_page() {
 }
 
 #[test]
+fn a_reloaded_chrome_puts_back_what_it_had_raised_over_the_page() {
+    let (mut shell, engine, screen) = setup();
+    shell.handle(Command::Bootstrap);
+    let id = active_id(&screen);
+    navigate_and_commit(&mut shell, id, "reload.example");
+    shell.handle(Command::SetChromeLayout {
+        top_bar: Some(40.0),
+    });
+    let raised = |engine: &FakeEngine| {
+        engine
+            .raised
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(raised, _, shape)| (*raised, *shape))
+            .collect::<Vec<_>>()
+    };
+    // Nothing is up: a reload asks native for nothing.
+    shell.handle(Command::Bootstrap);
+    assert!(raised(&engine).is_empty());
+
+    // The chrome reloads with a panel of the bar up. Its new document has no
+    // panel and never lowers one, and the chrome fills the window under a
+    // bar: left up, it would take every pointer from the page.
+    shell.handle(Command::RaiseChrome {
+        raised: true,
+        rect: Rect::new(300.0, 40.0, 360.0, 420.0),
+    });
+    shell.handle(Command::Bootstrap);
+    assert_eq!(
+        raised(&engine),
+        [(true, RaisedShape::Panel), (false, RaisedShape::Panel)]
+    );
+
+    // A card out goes back the same way, and only once.
+    shell.handle(Command::SetSidebarHidden(true));
+    shell.handle(Command::PeekSidebar {
+        peek: true,
+        slide: false,
+    });
+    shell.handle(Command::Bootstrap);
+    shell.handle(Command::Bootstrap);
+    assert_eq!(
+        raised(&engine)[2..],
+        [(true, RaisedShape::Card), (false, RaisedShape::Card)]
+    );
+
+    // A card put back by the frame leaves nothing for a reload to lower.
+    shell.handle(Command::PeekSidebar {
+        peek: true,
+        slide: false,
+    });
+    shell.handle(Command::PeekSidebar {
+        peek: false,
+        slide: false,
+    });
+    shell.handle(Command::Bootstrap);
+    assert_eq!(raised(&engine).len(), 6);
+}
+
+#[test]
 fn the_resize_guide_stands_below_a_top_bar() {
     let (mut shell, engine, _) = setup();
     shell.handle(Command::Bootstrap);

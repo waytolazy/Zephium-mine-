@@ -318,9 +318,22 @@
   baked into the picture, so the page only shows it.
 -->
 {#if plain}
-  <!-- Only the field, on the page's own colour. -->
+  <!-- Only the field, on the page's own colour. The band along its top still
+       moves the window, and the page's own settings stay a press away in its
+       corner, as on every other new tab: they are the way back from plain. -->
   <section class="plain" aria-label={m.new_tab()}>
+    <div class="plain-drag" data-tauri-drag-region aria-hidden="true"></div>
     <div class="plain-field">{@render search()}</div>
+    {#if oncustomize}<div class="plain-corner">
+        <IconButton
+          icon={Settings01Icon}
+          label={m.settings_customize_newtab()}
+          shape="circle"
+          size={16}
+          buttonSize={32}
+          onclick={oncustomize}
+        />
+      </div>{/if}
   </section>
 {:else}
   <section
@@ -573,6 +586,23 @@
     overflow: hidden;
     background: var(--color-page);
     isolation: isolate;
+  }
+
+  /* The window's title bar on a page that leaves its top empty, as the
+     sky's notch band is; the corner's control sits over it. */
+  .plain-drag {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: 0;
+    block-size: 50px;
+  }
+
+  .plain-corner {
+    position: absolute;
+    z-index: 1;
+    inset-block-start: 9px;
+    inset-inline-end: 14px;
+    display: flex;
   }
 
   .plain-field {

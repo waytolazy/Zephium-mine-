@@ -24,7 +24,7 @@
   import Icon from "$shared/ui/Icon";
   import IconButton from "$shared/ui/IconButton";
   import * as m from "$shared/i18n/messages";
-  import { BookmarksSession } from "../lib/bookmarks-session.svelte";
+  import { BookmarksSession, bookmarksWrites } from "../lib/bookmarks-session.svelte";
   import * as compose from "../lib/compose.svelte";
   import * as menuTarget from "../lib/menu-target";
   import * as reveal from "../lib/reveal.svelte";
@@ -124,6 +124,16 @@
       void (wanted ? current.reveal(wanted) : current.open(null));
       return () => current.stop();
     });
+  });
+
+  // Native announces no change to the bookmarks: a write made from the bar
+  // (a link renamed or deleted there) is read again here, where it shows.
+  let written = untrack(() => bookmarksWrites());
+  $effect(() => {
+    const count = bookmarksWrites();
+    if (count === written) return;
+    written = count;
+    untrack(() => void session.reload());
   });
 
   // Bookmark This Page while the panel is already open.

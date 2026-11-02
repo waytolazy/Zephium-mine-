@@ -5467,7 +5467,7 @@ fn chrome_set_layout(caller: WebviewWindow, shell: State<'_, Handle>, top_bar: O
         return;
     }
     #[cfg(any(target_os = "macos", target_os = "windows"))]
-    platform::imp::chrome_top_bar(&caller, top_bar.is_some());
+    platform::imp::chrome_top_bar(&caller, top_bar);
     shell.dispatch(Command::SetChromeLayout { top_bar });
 }
 
@@ -5501,6 +5501,8 @@ fn chrome_set_flush(caller: WebviewWindow, shell: State<'_, Handle>, flush: bool
     if !authorize(&caller, CallerPolicy::Main, "chrome_set_flush") {
         return;
     }
+    #[cfg(target_os = "macos")]
+    platform::imp::chrome_flush(&caller, flush);
     shell.dispatch(Command::SetChromeFlush(flush));
 }
 
@@ -8139,6 +8141,13 @@ mod tests {
     fn the_top_bars_tab_strip_keeps_the_presentation_barrier_reachable() {
         let row = crate::frame_sources::SRC_FEATURES_TABS_STRIPTAB_SVELTE;
         let strip = crate::frame_sources::SRC_FEATURES_TABS_TABSTRIP_SVELTE;
+        // Only markup binds a sentinel; the strip's script may look a row up
+        // by one, which puts no second row in the document.
+        let strip_markup = strip
+            .split("</script>")
+            .nth(1)
+            .and_then(|rest| rest.split("<style").next())
+            .expect("bounded strip markup");
 
         // Under a top bar the strip is the only tab list, so its rows are the
         // ones the barrier verifies the presenting tab through. A kept site or
@@ -8156,7 +8165,7 @@ mod tests {
                 "strip tab must own exactly one {sentinel} binding"
             );
             assert!(
-                !strip.contains(sentinel),
+                !strip_markup.contains(sentinel),
                 "the strip must not duplicate the row-owned {sentinel}"
             );
         }

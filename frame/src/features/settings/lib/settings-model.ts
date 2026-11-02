@@ -187,6 +187,13 @@ export const groups = [
   { id: "work", label: m.section_work },
   { id: "app", label: m.settings_application },
 ] as const;
+/** A row offered only beside another choice is found through that choice
+ *  while it is not offered, so a result never lands on a row that is not
+ *  there: the bookmarks bar belongs to the tabs across the top. */
+const standIns: Partial<Record<keyof typeof fields, () => keyof typeof fields | null>> = {
+  "appearance.bookmarks-bar": () =>
+    preferences.value("ui.tab-layout") === "horizontal" ? null : "appearance.layout",
+};
 export function searchSettings(query: string) {
   const words = query.trim().toLocaleLowerCase().split(/\s+/u);
   const matches = (text: string) => words.every((word) => text.toLocaleLowerCase().includes(word));
@@ -205,7 +212,7 @@ export function searchSettings(query: string) {
       section: field.section,
       label: field.label,
       description: field.description,
-      target: id as string | null,
+      target: (standIns[id as keyof typeof fields]?.() ?? id) as string | null,
     }));
   const destinations = offered
     .filter(

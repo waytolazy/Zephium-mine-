@@ -11,7 +11,7 @@
   import { reducedMotion } from "$shared/lib/motion";
   import DragMark from "$shared/ui/DragMark";
   import type { SidebarEntry } from "../lib/sidebar-model";
-  import { stripUnits } from "../lib/strip-model";
+  import { stripPlacement, stripUnits } from "../lib/strip-model";
   import StripTab from "./StripTab.svelte";
 
   let {
@@ -45,18 +45,20 @@
       // that cannot be kept goes back where it was.
       const essential = !!over.closest("[data-kept]");
       if (essential && !tabDrag.keepable(id)) return;
+      // The strip runs three lists together; native places a tab only before
+      // an item at the top of the list it joins.
+      const onto = over.closest<HTMLElement>("[data-zephium-tab-id]")?.dataset.zephiumTabId;
+      const place = stripPlacement({ favorites, pinned, today }, units, id, {
+        onto: onto ?? null,
+        before,
+        essential,
+      });
       // A split's member leaves it for wherever it is let go, as in the column.
       if (tabs.inSplit(id)) {
-        void tabDrag.leaveSplit(id, { essential, before });
+        void tabDrag.leaveSplit(id, place && { essential, before: place.before });
         return;
       }
-      // Let go where it already stands, in the same kind of place: nothing moves.
-      const order = units.flatMap((unit) =>
-        unit.kind === "split" ? unit.tabs.map((tab) => tab.id) : [unit.tab.id],
-      );
-      const kept = favorites.some((entry) => entry.kind === "tab" && entry.tab.id === id);
-      if (before === (order[order.indexOf(id) + 1] ?? null) && essential === kept) return;
-      void tabDrag.move(id, essential, before);
+      if (place) void tabDrag.move(id, essential, place.before);
     },
   });
   const handlePointerDown = (event: PointerEvent, tab: TabView) => drag.down(event, tab.id);
@@ -143,12 +145,17 @@
   }
 </script>
 
+<!--
+  The strip takes the bar's free room, so its own ground past the tabs moves
+  the window, as a tab strip's does in every browser; the tabs themselves
+  are buttons, which never do.
+-->
 <nav
   class="tab-strip"
   aria-label={m.open_tabs()}
   data-close-buttons={preferences.value("tabs.close-button")}
 >
-  <ul bind:this={list} class="strip-list" data-strip-drop role="list">
+  <ul bind:this={list} class="strip-list" data-strip-drop data-tauri-drag-region role="list">
     {#each units as unit (unit.key)}
       {#if unit.kind === "split"}
         {@const holdsActive = unit.tabs.some((tab) => tab.id === tabs.activeId())}

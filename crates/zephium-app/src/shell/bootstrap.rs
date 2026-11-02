@@ -22,6 +22,14 @@ impl Shell {
         // The chrome re-invokes bootstrap whenever its webview reloads (dev
         // HMR, crash recovery); state and native surfaces must not be rebuilt.
         if self.windows.focused().is_some() {
+            // A reloaded chrome has no card out and no panel open, so nothing
+            // it raised may stay over the page: under a top bar the chrome
+            // fills the window, and the page would take no pointer at all.
+            if let Some((window, shape)) = self.chrome_raised.take() {
+                let _ = self
+                    .engine
+                    .raise_chrome(window, false, Rect::default(), shape, false);
+            }
             let _ = self.relayout();
             self.forget_delivered_icons(zephium_ipc::IconSurface::Chrome);
             self.forget_offered_items();

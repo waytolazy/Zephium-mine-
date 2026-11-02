@@ -5,6 +5,7 @@ import "$styles/global.css";
 import type { BookmarkCall, BookmarkResponse, BookmarkView } from "$shared/ipc/bindings";
 import { emitNativeEvent } from "$shared/testing/native-events";
 import { uiCommands } from "$domain/ui-commands";
+import { browserImport, type ImportJob } from "$domain/browser-import";
 import { adoptLayout, resetChromeLayout } from "$session/chrome-layout.svelte";
 import { resetChromeRaise } from "$session/chrome-raise.svelte";
 import BookmarksBar from "../components/BookmarksBar.svelte";
@@ -71,6 +72,7 @@ beforeEach(async () => {
   await uiCommands.init();
 });
 afterEach(() => {
+  browserImport.provide(null);
   uiCommands.dispose();
   resetChromeLayout();
   resetChromeRaise();
@@ -239,4 +241,118 @@ test("many bookmarks stay in one row, and the last is reachable by the keyboard"
   const last = screen.getByRole("button", { name: "Bookmark number 39" });
   last.element().focus();
   expect(chips.scrollLeft).toBeGreaterThan(0);
+});
+
+test("a wheel turned over a full row moves it sideways, and leaves an open menu alone", async () => {
+  items = [
+    view("1", "Reading", null, 2),
+    ...Array.from({ length: 40 }, (_, index) =>
+      view(String(index + 10), `Bookmark number ${index}`, `https://site${index}.example/`),
+    ),
+  ];
+  const screen = await render(BookmarksBar, { profile: "p" });
+  await expect.element(screen.getByRole("button", { name: "Bookmark number 0" })).toBeVisible();
+  const chips = screen.container.querySelector<HTMLElement>(".chips")!;
+  const turn = () => {
+    const event = new WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true });
+    chips.querySelector(".chip")!.dispatchEvent(event);
+    return event;
+  };
+  expect(turn().defaultPrevented).toBe(true);
+  await expect.poll(() => chips.scrollLeft).toBeGreaterThan(0);
+
+  chips.scrollLeft = 0;
+  await screen.getByRole("button", { name: "Reading" }).click();
+  await expect.element(screen.getByRole("menuitem", { name: "Long read" })).toBeVisible();
+  expect(turn().defaultPrevented).toBe(false);
+  expect(chips.scrollLeft).toBe(0);
+});
+
+test("a link deleted from the bar can be put back where it was for a moment", async () => {
+  const screen = await render(BookmarksBar, { profile: "p" });
+  await expect.element(screen.getByRole("button", { name: "Rust docs" })).toBeVisible();
+  screen
+    .getByRole("button", { name: "Rust docs" })
+    .element()
+    .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+  items = top.filter((item) => item.id !== "3");
+  emitNativeEvent("uiCommand", "bookmark.menu.remove");
+  await vi.waitFor(() =>
+    expect(native.call).toHaveBeenCalledWith("p", { kind: "remove", id: "3" }),
+  );
+  const status = screen.getByRole("status");
+  await expect.element(status).toHaveTextContent("Deleted Rust docs");
+  await expect.element(screen.getByRole("button", { name: "Rust docs" })).not.toBeInTheDocument();
+
+  native.call.mockImplementation(async (_profile: string, call: BookmarkCall) =>
+    call.kind === "add_link" ? { kind: "saved", id: "30" } : answer(call),
+  );
+  await status.getByRole("button", { name: "Undo" }).click();
+  await vi.waitFor(() =>
+    expect(native.call).toHaveBeenCalledWith("p", {
+      kind: "add_link",
+      parent: null,
+      title: "Rust docs",
+      url: "https://doc.rust-lang.org/std/",
+    }),
+  );
+  await vi.waitFor(() =>
+    expect(native.call).toHaveBeenCalledWith("p", {
+      kind: "move",
+      id: "30",
+      parent: null,
+      index: 2,
+    }),
+  );
+  await expect.element(screen.getByRole("status")).not.toBeInTheDocument();
+});
+
+test("a folder taken away while its menu hangs over the page lowers the chrome", async () => {
+  adoptLayout("horizontal");
+  const screen = await render(BookmarksBar, { profile: "p" });
+  await screen.getByRole("button", { name: "Reading" }).click();
+  await expect.element(screen.getByRole("menuitem", { name: "Long read" })).toBeVisible();
+  await vi.waitFor(() => expect(native.raise.mock.calls.at(-1)![0]).toBe(true));
+
+  // Deleted elsewhere, and gone when the bar reads again (the window's focus
+  // coming back, here): no menu is left to say it closed.
+  items = top.filter((item) => item.id !== "1");
+  window.dispatchEvent(new Event("focus"));
+  await expect.element(screen.getByRole("button", { name: "Reading" })).not.toBeInTheDocument();
+  await vi.waitFor(() => expect(native.raise.mock.calls.at(-1)![0]).toBe(false));
+});
+
+test("bookmarks imported from another browser appear as they land", async () => {
+  items = [];
+  const progress = new Set<(job: ImportJob) => void>();
+  browserImport.provide({
+    sources: async () => [],
+    start: async () => true,
+    cancel: async () => {},
+    onProgress: (listener) => {
+      progress.add(listener);
+      return () => progress.delete(listener);
+    },
+    openPermissionSettings: async () => {},
+  });
+  const screen = await render(BookmarksBar, { profile: "p" });
+  await expect.element(screen.getByText("Bookmarks you add appear here.")).toBeVisible();
+  const job = (state: "running" | "done"): ImportJob => ({
+    source: "chrome",
+    profile: "Default",
+    kinds: [{ kind: "bookmarks", state, done: 1, total: 1 }],
+    finished: state === "done",
+    cancelled: false,
+  });
+  await browserImport.detect();
+  for (const listener of progress) listener(job("running"));
+  items = [view("9", "Imported", "https://imported.example/")];
+  for (const listener of progress) listener(job("done"));
+  await expect.element(screen.getByRole("button", { name: "Imported" })).toBeVisible();
+});
+
+test("a folder with no name is still named", async () => {
+  items = [view("1", "", null, 2), ...top.slice(1)];
+  const screen = await render(BookmarksBar, { profile: "p" });
+  await expect.element(screen.getByRole("button", { name: "Folder" })).toBeVisible();
 });

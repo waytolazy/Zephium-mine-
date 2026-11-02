@@ -8,6 +8,7 @@
   import { untrack } from "svelte";
   import SpaceGlyph from "./SpaceGlyph.svelte";
   import SpaceFlowBody from "./SpaceFlowBody.svelte";
+  import { expandBriefly, isHidden } from "$session/sidebar-mode.svelte";
   import * as requests from "../lib/space-requests.svelte";
   import { SpaceFlow } from "../lib/space-flow.svelte";
 
@@ -25,11 +26,16 @@
     if (restore) chip?.focus();
   });
 
+  // A menu (the menu bar's Spaces, a space's own) asks for the flow here
+  // even while the column waits beneath the page as a card, as it always
+  // does under the top bar: the column then stands beside the page for it,
+  // and goes back as the flow ends.
   $effect(() => {
     const command = ui.uiCommand();
     if (command.id !== "space.new" && command.id !== "space.edit") return;
     untrack(() => {
-      if (requests.claim(command.seq)) requests.ask(command.id === "space.new" ? "new" : "edit");
+      if (!requests.claim(command.seq)) return;
+      requests.ask(command.id === "space.new" ? "new" : "edit", isHidden() ? expandBriefly() : null);
     });
   });
 

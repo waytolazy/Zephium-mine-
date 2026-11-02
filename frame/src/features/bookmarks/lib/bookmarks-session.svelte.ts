@@ -108,7 +108,8 @@ export class BookmarksSession {
     );
   }
 
-  private refresh() {
+  /** Reads what is in view again, search or folder, as it stands now. */
+  reload() {
     return this.searching
       ? this.read({ kind: "search", query: this.query })
       : this.read({ kind: "list", folder: this.folder });
@@ -121,7 +122,7 @@ export class BookmarksSession {
       this.error = response.error;
       return false;
     }
-    await this.refresh();
+    await this.reload();
     writes += 1;
     return response.kind === "saved" ? response.id : null;
   }

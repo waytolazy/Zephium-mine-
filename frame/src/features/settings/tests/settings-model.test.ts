@@ -88,6 +88,32 @@ it("finds the look by its name and by what flat takes away", async () => {
     expect(searchSettings(query).some((result) => result.target === "appearance.look")).toBe(true);
 });
 
+it("finds the bookmarks bar through the tab layout while the tabs are in a sidebar", async () => {
+  let layout = "vertical";
+  vi.resetModules();
+  vi.doMock("$domain/preferences", async (actual) => {
+    const real = (await actual()) as typeof import("$domain/preferences");
+    return {
+      preferences: {
+        ...real.preferences,
+        value: (key: string) =>
+          key === "ui.tab-layout"
+            ? layout
+            : real.preferences.value(key as Parameters<typeof real.preferences.value>[0]),
+      },
+    };
+  });
+  const { searchSettings } = await import("../lib/settings-model");
+  const found = () =>
+    searchSettings("bookmarks bar").find((result) => result.id === "appearance.bookmarks-bar");
+  // The switch is only drawn beside tabs across the top; until then the row
+  // that offers that is where the result lands, never on nothing.
+  expect(found()?.target).toBe("appearance.layout");
+  layout = "horizontal";
+  expect(found()?.target).toBe("appearance.bookmarks-bar");
+  vi.doUnmock("$domain/preferences");
+});
+
 it("takes each feature's pages out of navigation and search while its switch is off", async () => {
   const off = new Set<string>();
   vi.resetModules();
